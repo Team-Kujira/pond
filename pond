@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+
+import argparse
+import subprocess
+import shutil
+import sys
+import os
+import json
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("action", choices=["init", "start", "stop", "info"])
+    parser.add_argument("--nodes", type=int, default=1,
+                        help="number of kujira validator nodes")
+    return parser.parse_args()
+
+
+def init(home, args):
+    cmd = []
+    extra_args = []
+
+    if shutil.which("docker"):
+        uid = os.getuid()
+        cmd = ["docker", "run", "-e", f"USER={uid}"]
+    elif shutil.which("podman"):
+        cmd = ["podman", "run"]
+        extra_args = ["--podman"]
+    else:
+        print("docker and podman not found")
+        sys.exit(1)
+
+    if not os.path.isdir(home):
+        os.mkdir(home)
+    else:
+        if os.listdir(home):
+            while True:
+                sys.stdout.write(
+                    "Delete existing chain data and init new chain? [y/N] "
+                )
+                choice = input().lower()
+
+                if choice in ["y", "yes"]:
+                    break
+
+                if choice in ["", "n", "no"]:
+                    return
+
+    cmd += [
+        "-v", f"{home}:/tmp/pond",
+        "docker.io/teamkujira/prepare:latest",
+        "prepare.py", "--nodes", f"{args.nodes}", "--clear"
+    ] + extra_args
+
+    subprocess.run(cmd)
+
+
+def info(home):
+    print(json.dumps(
+        json.load(open(f"{home}/info.json", "r")),
+        indent=2,
+    ))
+
+
+def main():
+    args = parse_args()
+
+    home = os.path.expanduser("~") + "/.pond"
+
+    if args.action == "init":
+        init(home, args)
+    else:
+        if not os.path.isdir(home):
+            print(f"{home} not found, you need to init pond at first")
+            sys.exit(1)
+
+        if args.action in ["start", "stop"]:
+            subprocess.run(f"{home}/{args.action}.sh")
+        elif args.action == "info":
+            info(home)
+
+
+if __name__ == "__main__":
+    main()
