@@ -10,27 +10,84 @@ import json
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=["init", "start", "stop", "info"])
-    parser.add_argument("--nodes", type=int, default=1,
-                        help="number of kujira validator nodes")
-    parser.add_argument("--docker", action="store_true", help="use docker")
-    parser.add_argument("--podman", action="store_true", help="use podman")
+
+    subparsers = parser.add_subparsers(title="commands", dest="command")
+
+    init_parser = subparsers.add_parser("init", help="initialize new pond")
+    init_parser.add_argument("--nodes", type=int, default=1,
+                             help="number of validators")
+    init_parser.add_argument("--podman", action="store_true",
+                             help="use podman")
+    init_parser.add_argument("--docker", action="store_true",
+                             help="use docker")
+
+    start_parser = subparsers.add_parser("start", help="start components")
+    start_parser.add_argument("target", nargs="?")
+
+    stop_parser = subparsers.add_parser("stop", help="stop components")
+    stop_parser.add_argument("target", nargs="?")
+
+    subparsers.add_parser("info", help="info components")
+
     return parser.parse_args()
 
 
+def start_node_cmd(cmd, name, home, ports):
+    port_args = " ".join([f"-p 127.0.0.1:{x}:{x}" for x in ports])
+
+    commands = {
+        "docker": [
+            f"docker rm {name}".split(),
+            f"docker run -e USER=$UID -d {port_args} --network pond --name {name} --network-alias {name} -v {home}/{name}:/kujira teamkujira/kujirad:v0.9.0 kujirad --home /kujira start".split()
+        ],
+        "podman": [
+            f"podman run --name {name} -d --pod pond -v {home}/{name}:/kujira teamkujira/kujirad:v0.9.0 kujirad --home /kujira start".split()
+        ]
+    }
+
+    return commands.get(cmd)
+
+
+def start_feeder_cmd(cmd, name, home, mnemonic):
+    commands = {
+        "docker": [
+            f"docker rm {name}".split(),
+            f"docker run -e USER=$UID -d --network pond --network-alias {name} --name {name} -v {home}/{name}:/feeder -e".split(
+            ) + [f"PRICE_FEEDER_MNEMONIC={ mnemonic }", "teamkujira/feeder:next"]
+        ],
+        "podman": [
+            f"podman run --name {name} -d --pod pond -v {home}/{name}:/feeder -e".split(
+            ) + [f"PRICE_FEEDER_MNEMONIC={ mnemonic }", "teamkujira/feeder:next"]
+        ]
+    }
+
+    return commands.get(cmd)
+
+
 def init(home, args):
-    cmd = []
+    cmd = None
     extra_args = []
 
-    if shutil.which("docker") or args.docker:
+    if args.docker:
+        cmd = "docker"
+    elif args.podman:
+        cmd = "podman"
+    else:
+        if shutil.which("docker"):
+            cmd = "docker"
+        elif shutil.which("podman"):
+            cmd = "podman"
+
+    if not cmd:
+        print("neither docker nor podman found")
+        sys.exit(1)
+
+    if cmd == "docker":
         uid = os.getuid()
         cmd = ["docker", "run", "-e", f"USER={uid}"]
-    elif shutil.which("podman") or args.podman:
+    else:
         cmd = ["podman", "run"]
         extra_args = ["--podman"]
-    else:
-        print("docker and podman not found")
-        sys.exit(1)
 
     if not os.path.isdir(home):
         os.mkdir(home)
@@ -50,7 +107,8 @@ def init(home, args):
 
     cmd += [
         "-v", f"{home}:/tmp/pond",
-        "docker.io/teamkujira/prepare:latest",
+        "starsquid/prepare:latest-arm64",
+        # "docker.io/teamkujira/prepare:latest",
         "prepare.py", "--nodes", f"{args.nodes}", "--clear"
     ] + extra_args
 
@@ -59,26 +117,100 @@ def init(home, args):
 
 def info(home):
     print(json.dumps(
-        json.load(open(f"{home}/info.json", "r")),
+        json.load(open(f"{home}/pond.json", "r")),
         indent=2,
     ))
+
+
+def start(config, home):
+    cmd = config.get("command")
+    if not cmd:
+        print("command not set")
+
+    commands = [["sleep", "2"]]
+
+    ports = []
+    for chain_id, chain in config["chains"].items():
+        for validator in chain["validators"]:
+            _ports = [
+                validator["api_url"].split(":")[-1],
+                validator["rpc_url"].split(":")[-1]
+            ]
+
+            ports += _ports
+
+            name = validator["moniker"].lower()
+            commands = start_node_cmd(cmd, name, home, _ports) + commands
+
+            if chain_id == "pond-1":
+                name = name.replace("kujira", "feeder")
+                commands += start_feeder_cmd(cmd,
+                                             name, home, validator["mnemonic"])
+
+    port_args = " ".join([f"-p {x}:{x}" for x in ports])
+
+    if cmd == "podman":
+        commands = [
+            f"podman pod rm --force pond".split(),
+            f"podman pod create --name pond {port_args}".split()
+        ] + commands
+
+    if cmd == "docker":
+        commands = [
+            "docker network rm pond".split(),
+            "docker network create pond".split()
+        ] + commands
+
+    run(commands)
+
+
+def stop(config):
+    cmd = config.get("command")
+    if not cmd:
+        print("command not set")
+
+    commands = []
+    for chain_id, chain in config["chains"].items():
+        for validator in chain["validators"]:
+            name = validator["moniker"].lower()
+            commands.append([cmd, "kill", name])
+
+            if chain_id == "pond-1":
+                name = name.replace("kujira", "feeder")
+                commands.append([cmd, "kill", name])
+
+    if cmd == "podman":
+        commands.append([cmd, "pod", "kill", "pond"])
+
+    run(commands)
+
+
+def run(commands):
+    for cmd in commands:
+        print(cmd)
+        subprocess.run(cmd)
 
 
 def main():
     args = parse_args()
 
     home = os.path.expanduser("~") + "/.pond"
+    config = None
 
-    if args.action == "init":
+    if args.command == "init":
         init(home, args)
     else:
         if not os.path.isdir(home):
             print(f"{home} not found, you need to init pond at first")
             sys.exit(1)
 
-        if args.action in ["start", "stop"]:
-            subprocess.run(f"{home}/{args.action}.sh")
-        elif args.action == "info":
+        config = json.load(open(f"{home}/pond.json", "r"))
+
+        if args.command == "start":
+            start(config, home)
+        elif args.command == "stop":
+            stop(config)
+        elif args.command == "info":
             info(home)
 
 
