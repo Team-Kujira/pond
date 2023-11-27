@@ -107,8 +107,7 @@ def init(home, args):
 
     cmd += [
         "-v", f"{home}:/tmp/pond",
-        "starsquid/prepare:latest-arm64",
-        # "docker.io/teamkujira/prepare:latest",
+        "docker.io/teamkujira/prepare:latest",
         "prepare.py", "--nodes", f"{args.nodes}", "--clear"
     ] + extra_args
 
