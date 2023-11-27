@@ -6,12 +6,15 @@ import shutil
 import sys
 import os
 import json
+import requests
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
-    subparsers = parser.add_subparsers(title="commands", dest="command")
+    subparsers = parser.add_subparsers()
+    subparsers.required = True
+    subparsers.dest = "command"
 
     init_parser = subparsers.add_parser("init", help="initialize new pond")
     init_parser.add_argument("--nodes", type=int, default=1,
@@ -20,6 +23,9 @@ def parse_args():
                              help="use podman")
     init_parser.add_argument("--docker", action="store_true",
                              help="use docker")
+    init_parser.add_argument("--kujira-version", default="mainnet")
+    init_parser.add_argument("--feeder-version", default="mainnet")
+    init_parser.add_argument("--namespace", default="teamkujira")
 
     start_parser = subparsers.add_parser("start", help="start components")
     start_parser.add_argument("target", nargs="?")
@@ -29,35 +35,63 @@ def parse_args():
 
     subparsers.add_parser("info", help="info components")
 
+    subparsers.add_parser("tags", help="print available tags")
+
     return parser.parse_args()
 
 
-def start_node_cmd(cmd, name, home, ports):
+def get_tags(namespace, components=["kujira", "feeder"]):
+    all_tags = {}
+    baseurl = f"https://hub.docker.com/v2/namespaces/{namespace}/repositories"
+
+    for component in components:
+        url = f"{baseurl}/{component}/tags"
+        # print(url)
+        response = requests.get(url)
+        if response.status_code != 200:
+            print(f"docker api returned http-{response.status_code}")
+            return
+
+        tags = []
+        data = response.json()
+        for result in data.get("results", []):
+            tag = result["name"]
+            if tag.endswith("-arm64") or tag.endswith("-x86_64"):
+                continue
+            tags.append(tag)
+
+        all_tags[component] = tags
+    # https://hub.docker.com/v2/namespaces/teamkujira/repositories/feeder/tags
+
+    print(json.dumps(all_tags, indent=2))
+
+
+def start_node_cmd(cmd, namespace, name, version, home, ports):
     port_args = " ".join([f"-p 127.0.0.1:{x}:{x}" for x in ports])
 
     commands = {
         "docker": [
             f"docker rm {name}".split(),
-            f"docker run -e USER=$UID -d {port_args} --network pond --name {name} --network-alias {name} -v {home}/{name}:/kujira teamkujira/kujirad:v0.9.0 kujirad --home /kujira start".split()
+            f"docker run -e USER=$UID -d {port_args} --network pond --name {name} --network-alias {name} -v {home}/{name}:/kujira {namespace}/kujira:{version} kujirad --home /kujira start".split()
         ],
         "podman": [
-            f"podman run --name {name} -d --pod pond -v {home}/{name}:/kujira teamkujira/kujirad:v0.9.0 kujirad --home /kujira start".split()
+            f"podman run --name {name} -d --pod pond -v {home}/{name}:/kujira {namespace}/kujira:{version} kujirad --home /kujira start".split()
         ]
     }
 
     return commands.get(cmd)
 
 
-def start_feeder_cmd(cmd, name, home, mnemonic):
+def start_feeder_cmd(cmd, namespace, name, version, home, mnemonic):
     commands = {
         "docker": [
             f"docker rm {name}".split(),
             f"docker run -e USER=$UID -d --network pond --network-alias {name} --name {name} -v {home}/{name}:/feeder -e".split(
-            ) + [f"PRICE_FEEDER_MNEMONIC={ mnemonic }", "teamkujira/feeder:next"]
+            ) + [f"PRICE_FEEDER_MNEMONIC={ mnemonic }", f"{namespace}/feeder:{version}"]
         ],
         "podman": [
             f"podman run --name {name} -d --pod pond -v {home}/{name}:/feeder -e".split(
-            ) + [f"PRICE_FEEDER_MNEMONIC={ mnemonic }", "teamkujira/feeder:next"]
+            ) + [f"PRICE_FEEDER_MNEMONIC={ mnemonic }", f"{namespace}/feeder:{version}"]
         ]
     }
 
@@ -105,13 +139,23 @@ def init(home, args):
                 if choice in ["", "n", "no"]:
                     return
 
-    cmd += [
+    kujira_cmd = cmd + [
         "-v", f"{home}:/tmp/pond",
-        "docker.io/teamkujira/prepare:latest",
+        f"docker.io/{args.namespace}/prepare-kujira:{args.kujira_version}",
         "prepare.py", "--nodes", f"{args.nodes}", "--clear"
     ] + extra_args
 
-    subprocess.run(cmd)
+    feeder_cmd = cmd + [
+        "-v", f"{home}:/tmp/pond",
+        f"docker.io/{args.namespace}/prepare-feeder:{args.feeder_version}",
+        "prepare.py",
+    ] + extra_args
+
+    # print(kujira_cmd)
+    # print(feeder_cmd)
+
+    subprocess.run(kujira_cmd)
+    subprocess.run(feeder_cmd)
 
 
 def info(home):
@@ -121,10 +165,12 @@ def info(home):
     ))
 
 
-def start(config, home):
+def start(args, config, home):
     cmd = config.get("command")
     if not cmd:
         print("command not set")
+
+    ns = args.namespace
 
     commands = [["sleep", "2"]]
 
@@ -139,12 +185,17 @@ def start(config, home):
             ports += _ports
 
             name = validator["moniker"].lower()
-            commands = start_node_cmd(cmd, name, home, _ports) + commands
+            version = config["version"]["kujira"]
+            commands = start_node_cmd(
+                cmd, ns, name, version, home, _ports
+            ) + commands
 
             if chain_id == "pond-1":
                 name = name.replace("kujira", "feeder")
-                commands += start_feeder_cmd(cmd,
-                                             name, home, validator["mnemonic"])
+                version = config["version"]["feeder"]
+                commands += start_feeder_cmd(
+                    cmd, ns, name, version, home, validator["mnemonic"]
+                )
 
     port_args = " ".join([f"-p {x}:{x}" for x in ports])
 
@@ -186,7 +237,7 @@ def stop(config):
 
 def run(commands):
     for cmd in commands:
-        print(cmd)
+        # print(cmd)
         subprocess.run(cmd)
 
 
@@ -206,11 +257,13 @@ def main():
         config = json.load(open(f"{home}/pond.json", "r"))
 
         if args.command == "start":
-            start(config, home)
+            start(args, config, home)
         elif args.command == "stop":
             stop(config)
         elif args.command == "info":
             info(home)
+        elif args.command == "tags":
+            get_tags(args.namespace)
 
 
 if __name__ == "__main__":
