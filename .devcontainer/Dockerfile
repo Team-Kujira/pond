@@ -13,11 +13,11 @@ COPY pond /usr/local/bin/
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends curl jq \
     && apt-get -y install ca-certificates curl python3-pip python3-dev python3-setuptools python3-wheel \
+    && pip install --upgrade pip && pip install requests \
     && sudo rm -rf /var/lib/apt/lists/*
+
+# RUN pond init --nodes 1
 
 RUN rustup update stable \
     && rustup target add wasm32-unknown-unknown
 
-RUN cargo install cargo-run-script cargo-tarpaulin
-
-# RUN pond init --nodes 1

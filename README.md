@@ -35,3 +35,19 @@ pond stop
 ```bash
 pond info
 ```
+
+### Dev Containers
+
+To open the repository in a VS Code Devcontainer:
+- Use VS Code on your local machine
+- Install the [Dev Containers VS Code extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+- Click on the bottom left and choose to Reopen in Container
+
+[!WARNING]
+Do not use it in Github Codespaces as the Kujira apps will not see it at the required IP Addresses
+
+This will install:
+1. Pond
+2. Rust with cosmwasm and wasmd
+3. Node
+4. Go
