@@ -16,8 +16,6 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && pip install --upgrade pip && pip install requests \
     && sudo rm -rf /var/lib/apt/lists/*
 
-# RUN pond init --nodes 1
-
 RUN rustup update stable \
     && rustup target add wasm32-unknown-unknown
 
