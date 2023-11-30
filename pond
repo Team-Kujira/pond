@@ -69,11 +69,12 @@ def get_tags(namespace, components=["kujira", "feeder"]):
 
 def start_node_cmd(cmd, namespace, name, version, home, ports):
     port_args = " ".join([f"-p 127.0.0.1:{x}:{x}" for x in ports])
+    uid = os.getuid()
 
     commands = {
         "docker": [
             f"docker rm {name}".split(),
-            f"docker run -e USER=$UID -d {port_args} --network pond --name {name} --network-alias {name} -v {home}/{name}:/kujira {namespace}/kujira:{version} kujirad --home /kujira start".split()
+            f"docker run -e USER={uid} -d {port_args} --network pond --name {name} --network-alias {name} -v {home}/{name}:/kujira {namespace}/kujira:{version} kujirad --home /kujira start".split()
         ],
         "podman": [
             f"podman run --name {name} -d --pod pond -v {home}/{name}:/kujira {namespace}/kujira:{version} kujirad --home /kujira start".split()
@@ -84,10 +85,12 @@ def start_node_cmd(cmd, namespace, name, version, home, ports):
 
 
 def start_feeder_cmd(cmd, namespace, name, version, home, mnemonic):
+    uid = os.getuid()
+
     commands = {
         "docker": [
             f"docker rm {name}".split(),
-            f"docker run -e USER=$UID -d --network pond --network-alias {name} --name {name} -v {home}/{name}:/feeder -e".split(
+            f"docker run -e USER={uid} -d --network pond --network-alias {name} --name {name} -v {home}/{name}:/feeder -e".split(
             ) + [f"PRICE_FEEDER_MNEMONIC={ mnemonic }", f"{namespace}/feeder:{version}"]
         ],
         "podman": [
