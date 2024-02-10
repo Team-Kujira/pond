@@ -1,6 +1,8 @@
 # pond
 
-Pond is an easy way to set up a local Kujira development chain.
+Pond is an easy way to set up a local Kujira development chain. It uses docker containers to set up two local Kujira chains, price feeder and an IBC relayer connecting both chains.
+
+The second chain is meant to test IBC related things and therefore has only one validator and no price feeder.
 
 ## Installation
 
