@@ -201,7 +201,7 @@ def start(args, config, home):
                 cmd, ns, name, version, home, _ports
             ) + commands
 
-            if chain_id == "kujira-1":
+            if chain_id == "pond-1":
                 name = name.replace("kujira", "feeder")
                 version = config["version"]["feeder"]
                 commands += start_feeder_cmd(
@@ -242,7 +242,7 @@ def stop(config):
             name = validator["moniker"].lower()
             commands.append([cmd, "kill", name])
 
-            if chain_id == "kujira-1":
+            if chain_id == "pond-1":
                 name = name.replace("kujira", "feeder")
                 commands.append([cmd, "kill", name])
 
