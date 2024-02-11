@@ -8,6 +8,8 @@ import os
 import json
 import requests
 
+VERSION = "v0.1.0"
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -25,8 +27,8 @@ def parse_args():
                              help="use podman")
     init_parser.add_argument("--docker", action="store_true",
                              help="use docker")
-    init_parser.add_argument("--kujira-version", default="mainnet")
-    init_parser.add_argument("--feeder-version", default="mainnet")
+    # init_parser.add_argument("--kujira-version", default="v0.9.3-1")
+    # init_parser.add_argument("--feeder-version", default="mainnet")
 
     start_parser = subparsers.add_parser("start", help="start components")
     start_parser.add_argument("target", nargs="?")
@@ -47,7 +49,6 @@ def get_tags(namespace, components=["kujira", "feeder"]):
 
     for component in components:
         url = f"{baseurl}/{component}/tags"
-        # print(url)
         response = requests.get(url)
         if response.status_code != 200:
             print(f"docker api returned http-{response.status_code}")
@@ -102,6 +103,22 @@ def start_feeder_cmd(cmd, namespace, name, version, home, mnemonic):
     return commands.get(cmd)
 
 
+def start_relayer_cmd(cmd, namespace, version, home):
+    uid = os.getuid()
+
+    commands = {
+        "docker": [
+            f"docker rm relayer".split(),
+            f"docker run -e USER={uid} -d --network pond --network-alias relayer --name relayer -v {home}/relayer:/relayer {namespace}/relayer:{version} link-and-start-pond.sh".split(),
+        ],
+        "podman": [
+            f"podman run --name relayer -d --pod pond -v {home}/relayer:/relayer {namespace}/relayer:{version} link-and-start-pond.sh".split(),
+        ]
+    }
+
+    return commands.get(cmd)
+
+
 def init(home, args):
     cmd = None
     extra_args = []
@@ -143,23 +160,13 @@ def init(home, args):
                 if choice in ["", "n", "no"]:
                     return
 
-    kujira_cmd = cmd + [
+    cmd += [
         "-v", f"{home}:/tmp/pond",
-        f"docker.io/{args.namespace}/prepare-kujira:{args.kujira_version}",
+        f"docker.io/{args.namespace}/prepare:{VERSION}",
         "prepare.py", "--nodes", f"{args.nodes}", "--clear"
     ] + extra_args
 
-    feeder_cmd = cmd + [
-        "-v", f"{home}:/tmp/pond",
-        f"docker.io/{args.namespace}/prepare-feeder:{args.feeder_version}",
-        "prepare.py",
-    ] + extra_args
-
-    # print(kujira_cmd)
-    # print(feeder_cmd)
-
-    subprocess.run(kujira_cmd)
-    subprocess.run(feeder_cmd)
+    subprocess.run(cmd)
 
 
 def info(home):
@@ -179,8 +186,8 @@ def start(args, config, home):
     commands = [["sleep", "2"]]
 
     ports = []
-    for chain_id, chain in config["chains"].items():
-        for validator in chain["validators"]:
+    for chain_id, validators in config["validators"].items():
+        for validator in validators:
             _ports = [
                 validator["api_url"].split(":")[-1],
                 validator["rpc_url"].split(":")[-1]
@@ -200,6 +207,9 @@ def start(args, config, home):
                 commands += start_feeder_cmd(
                     cmd, ns, name, version, home, validator["mnemonic"]
                 )
+
+    version = config["version"]["relayer"]
+    commands += start_relayer_cmd(cmd, ns, version, home)
 
     port_args = " ".join([f"-p {x}:{x}" for x in ports])
 
@@ -223,9 +233,12 @@ def stop(config):
     if not cmd:
         print("command not set")
 
-    commands = []
-    for chain_id, chain in config["chains"].items():
-        for validator in chain["validators"]:
+    commands = [
+        [cmd, "kill", "relayer"]
+    ]
+
+    for chain_id, validators in config["validators"].items():
+        for validator in validators:
             name = validator["moniker"].lower()
             commands.append([cmd, "kill", name])
 
@@ -241,7 +254,6 @@ def stop(config):
 
 def run(commands):
     for cmd in commands:
-        # print(cmd)
         subprocess.run(cmd)
 
 
