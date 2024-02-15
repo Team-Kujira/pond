@@ -7,8 +7,12 @@ import sys
 import os
 import json
 import requests
+from urllib.parse import urlparse
 
-VERSION = "v0.1.0"
+TAGS = [
+    "v0.1.0",
+    "oracle"
+]
 
 
 def parse_args():
@@ -27,8 +31,7 @@ def parse_args():
                              help="use podman")
     init_parser.add_argument("--docker", action="store_true",
                              help="use docker")
-    # init_parser.add_argument("--kujira-version", default="v0.9.3-1")
-    # init_parser.add_argument("--feeder-version", default="mainnet")
+    init_parser.add_argument("--tag", default=TAGS[0], help="tag")
 
     start_parser = subparsers.add_parser("start", help="start components")
     start_parser.add_argument("target", nargs="?")
@@ -41,31 +44,6 @@ def parse_args():
     subparsers.add_parser("tags", help="print available tags")
 
     return parser.parse_args()
-
-
-def get_tags(namespace, components=["kujira", "feeder"]):
-    all_tags = {}
-    baseurl = f"https://hub.docker.com/v2/namespaces/{namespace}/repositories"
-
-    for component in components:
-        url = f"{baseurl}/{component}/tags"
-        response = requests.get(url)
-        if response.status_code != 200:
-            print(f"docker api returned http-{response.status_code}")
-            return
-
-        tags = []
-        data = response.json()
-        for result in data.get("results", []):
-            tag = result["name"]
-            if tag.endswith("-arm64") or tag.endswith("-x86_64"):
-                continue
-            tags.append(tag)
-
-        all_tags[component] = tags
-    # https://hub.docker.com/v2/namespaces/teamkujira/repositories/feeder/tags
-
-    print(json.dumps(all_tags, indent=2))
 
 
 def start_node_cmd(cmd, namespace, name, version, home, ports):
@@ -85,18 +63,16 @@ def start_node_cmd(cmd, namespace, name, version, home, ports):
     return commands.get(cmd)
 
 
-def start_feeder_cmd(cmd, namespace, name, version, home, mnemonic):
+def start_feeder_cmd(cmd, namespace, name, version, home, port):
     uid = os.getuid()
 
     commands = {
         "docker": [
             f"docker rm {name}".split(),
-            f"docker run -e USER={uid} -d --network pond --network-alias {name} --name {name} -v {home}/{name}:/feeder -e".split(
-            ) + [f"PRICE_FEEDER_MNEMONIC={ mnemonic }", f"{namespace}/feeder:{version}"]
+            f"docker run -e USER={uid} -d -p 127.0.0.1:{port}:{port} --network pond --network-alias {name} --name {name} -v {home}/{name}:/feeder {namespace}/feeder:{version} price-feeder config.toml".split()
         ],
         "podman": [
-            f"podman run --name {name} -d --pod pond -v {home}/{name}:/feeder -e".split(
-            ) + [f"PRICE_FEEDER_MNEMONIC={ mnemonic }", f"{namespace}/feeder:{version}"]
+            f"podman run --name {name} -d --pod pond -v {home}/{name}:/feeder {namespace}/feeder:{version} price-feeder config.toml".split()
         ]
     }
 
@@ -162,7 +138,7 @@ def init(home, args):
 
     cmd += [
         "-v", f"{home}:/tmp/pond",
-        f"docker.io/{args.namespace}/prepare:{VERSION}",
+        f"docker.io/{args.namespace}/prepare:{args.tag}",
         "prepare.py", "--nodes", f"{args.nodes}", "--clear"
     ] + extra_args
 
@@ -188,24 +164,30 @@ def start(args, config, home):
     ports = []
     for chain_id, validators in config["validators"].items():
         for validator in validators:
-            _ports = [
-                validator["api_url"].split(":")[-1],
-                validator["rpc_url"].split(":")[-1]
+            node_ports = [
+                urlparse(validator["api_url"]).port,
+                urlparse(validator["rpc_url"]).port
             ]
 
-            ports += _ports
+            # backwards compatibility
+            if "app_url" in validator.keys():
+                node_ports.append(urlparse(validator["app_url"]).port)
+
+            ports += node_ports
 
             name = validator["moniker"].lower()
             version = config["version"]["kujira"]
             commands = start_node_cmd(
-                cmd, ns, name, version, home, _ports
+                cmd, ns, name, version, home, node_ports
             ) + commands
 
             if chain_id == "pond-1":
                 name = name.replace("kujira", "feeder")
                 version = config["version"]["feeder"]
+                node_port = urlparse(validator["feeder_url"]).port
+                ports.append(node_port)
                 commands += start_feeder_cmd(
-                    cmd, ns, name, version, home, validator["mnemonic"]
+                    cmd, ns, name, version, home, node_port
                 )
 
     version = config["version"]["relayer"]
@@ -279,7 +261,8 @@ def main():
         elif args.command == "info":
             info(home)
         elif args.command == "tags":
-            get_tags(args.namespace)
+            for i in TAGS:
+                print(i)
 
 
 if __name__ == "__main__":
