@@ -6,19 +6,17 @@ import shutil
 import sys
 import os
 import json
-import requests
 from urllib.parse import urlparse
+import logging
 
-TAGS = [
-    "v0.1.0",
-    "oracle"
-]
+TAG = "v0.2.0"
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--namespace", default="teamkujira")
+    parser.add_argument("--debug", action="store_true")
 
     subparsers = parser.add_subparsers()
     subparsers.required = True
@@ -31,7 +29,7 @@ def parse_args():
                              help="use podman")
     init_parser.add_argument("--docker", action="store_true",
                              help="use docker")
-    init_parser.add_argument("--tag", default=TAGS[0], help="tag")
+    init_parser.add_argument("--tag", default=TAG, help="tag")
 
     start_parser = subparsers.add_parser("start", help="start components")
     start_parser.add_argument("target", nargs="?")
@@ -40,7 +38,6 @@ def parse_args():
     stop_parser.add_argument("target", nargs="?")
 
     subparsers.add_parser("info", help="info components")
-
     subparsers.add_parser("tags", help="print available tags")
 
     return parser.parse_args()
@@ -52,7 +49,7 @@ def start_node_cmd(cmd, namespace, name, version, home, ports):
 
     commands = {
         "docker": [
-            f"docker rm {name}".split(),
+            f"docker rm -f {name}".split(),
             f"docker run -e USER={uid} -d {port_args} --network pond --name {name} --network-alias {name} -v {home}/{name}:/kujira {namespace}/kujira:{version} kujirad --home /kujira start".split()
         ],
         "podman": [
@@ -110,8 +107,7 @@ def init(home, args):
             cmd = "podman"
 
     if not cmd:
-        print("neither docker nor podman found")
-        sys.exit(1)
+        error("neither docker nor podman found")
 
     if cmd == "docker":
         uid = os.getuid()
@@ -155,7 +151,7 @@ def info(home):
 def start(args, config, home):
     cmd = config.get("command")
     if not cmd:
-        print("command not set")
+        error("command not set")
 
     ns = args.namespace
 
@@ -207,13 +203,39 @@ def start(args, config, home):
             "docker network create pond".split()
         ] + commands
 
+    if not config.get("codes"):
+        commands.append(["sleep", "5"])
+
+        extra = []
+        if cmd == "docker":
+            uid = os.getuid()
+            command = ["docker", "run", "-e",
+                       f"USER={uid}", "--network", "pond"]
+            host = "kujira1-1"
+        else:
+            command = ["podman", "run", "--pod", "pond"]
+            host = "127.0.0.1"
+
+        version = config["version"]["prepare"]
+
+        command += [
+            "-v", f"{home}:/tmp/pond",
+            f"docker.io/{args.namespace}/prepare:{version}",
+            "/tmp/contracts/deploy.py", "/tmp/contracts/plans",
+            "--home", "/tmp/pond/kujira1-1",
+            "--node", f"http://{host}:10157",
+            "--pond-json", "/tmp/pond/pond.json"
+        ]
+
+        commands.append(command)
+
     run(commands)
 
 
 def stop(config):
     cmd = config.get("command")
     if not cmd:
-        print("command not set")
+        error("command not set")
 
     commands = [
         [cmd, "kill", "relayer"]
@@ -236,11 +258,27 @@ def stop(config):
 
 def run(commands):
     for cmd in commands:
-        subprocess.run(cmd)
+        debug(" ".join(cmd))
+        # subprocess.call(cmd)
+        subprocess.call(cmd, stdout=subprocess.DEVNULL)
 
 
 def main():
     args = parse_args()
+
+    log_level = logging.INFO
+    if args.debug:
+        log_level = logging.DEBUG
+
+    logging.basicConfig(
+        level=log_level,
+        format="%(levelname)s %(message)s"
+    )
+
+    logging.addLevelName(logging.DEBUG, "DBG")
+    logging.addLevelName(logging.INFO, "INF")
+    logging.addLevelName(logging.WARNING, "WRN")
+    logging.addLevelName(logging.ERROR, "ERR")
 
     home = os.path.expanduser("~") + "/.pond"
     config = None
@@ -249,20 +287,91 @@ def main():
         init(home, args)
     else:
         if not os.path.isdir(home):
-            print(f"{home} not found, you need to init pond at first")
-            sys.exit(1)
+            error(f"{home} not found, you need to init pond at first")
 
         config = json.load(open(f"{home}/pond.json", "r"))
 
         if args.command == "start":
+            if is_running(config):
+                info("pond already running")
+                return
+
             start(args, config, home)
         elif args.command == "stop":
+            if not is_running(config):
+                return
             stop(config)
         elif args.command == "info":
             info(home)
         elif args.command == "tags":
             for i in TAGS:
                 print(i)
+
+
+def is_running(config):
+    cmd = config.get("command")
+    if not cmd:
+        error("command not set")
+
+    command = [
+        cmd, "ps", "--format", "json"
+    ]
+
+    result = subprocess.check_output(command)
+    if not result:
+        return False
+
+    result = result.decode('utf8').replace("'", '"')
+
+    if cmd == "docker":
+        result = result.replace("\n", ",")
+        result = f"[{result[:-1]}]"
+    else:
+        result = result[:-1]
+
+    data = json.loads(result)
+
+    for i in data:
+        if cmd == "docker":
+            if i.get("Networks") == "pond":
+                return True
+        else:
+            if i.get("PodName") == "pond":
+                return True
+
+    return False
+
+
+def error(message=None, **kwargs):
+    log(message, logging.ERROR, kwargs)
+    sys.exit(1)
+
+
+def warning(message=None, **kwargs):
+    log(message, logging.WARNING, kwargs)
+
+
+def debug(message=None, **kwargs):
+    log(message, logging.DEBUG, kwargs)
+
+
+def info(message=None, **kwargs):
+    log(message, logging.INFO, kwargs)
+
+
+def log(message, level, kwargs):
+    tags = []
+    for k, v in kwargs.items():
+        tags.append(f"{k}={v}")
+
+    tags = ", ".join(tags)
+
+    if message:
+        message = f"{message} {tags}"
+    else:
+        message = tags
+
+    logging.log(level, message)
 
 
 if __name__ == "__main__":
