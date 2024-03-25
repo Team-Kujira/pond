@@ -162,7 +162,8 @@ def start(args, config, home):
         for validator in validators:
             node_ports = [
                 urlparse(validator["api_url"]).port,
-                urlparse(validator["rpc_url"]).port
+                validator["rpc_url"].split(":")[-1],
+                validator["rpc_url"].split(":")[-1][:-2] + "90"
             ]
 
             # backwards compatibility
