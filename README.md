@@ -1,103 +1,465 @@
 # pond
 
-Pond is an easy way to set up a local Kujira development chain. It uses docker containers to set up two local Kujira chains, price feeder and an IBC relayer connecting both chains.
+Pond is an easy way to set up a local Kujira development chain.
 
-The second chain is meant to test IBC related things and therefore has only one validator and no price feeder.
+It creates one or more local Cosmos chains and connects them via [IBC](https://docs.cosmos.network/v0.45/ibc/overview.html), sets up price feeders for the on-chain oracle and deploys a set of Kujira core smart contracts.
+
+Because Pond is meant to help builders on Kujira, its first and default chain will always be a Kujira chain and some of the commands (like `deploy` or `gov`) may only work here.
 
 ## Installation
 
-```bash
-sudo cp pond /usr/local/bin/
+Requires golang `>=1.21`
+
+```text
+make install
 ```
 
-## Usage
+## Init
 
-### Init new pond
+Init creates all required configurations for validator nodes, price feeders and the IBC relayer.
 
-The init step creates the validator and price feeder config needed to run a local Kujira chain and stores it in `$HOME/.pond`.
+The default configuration sets up a single Kujira chain with one validator node.
 
-```bash
-pond init --nodes 1
+```text
+pond init
 ```
 
-### Start pond
+### Nodes
 
-```bash
+Set the number of validator nodes on the main (Kujira) chain. The default value is one, maximum is nine.
+
+```text
+pond init --nodes 3
+```
+
+### Chains
+
+If you need different or more partner chains, thats possible too. All chains will be connected to the first (Kujira) chain.
+
+```text
+pond init --chains cosmoshub
+```
+
+```text
+pond init --chains kujira,kujira,terra2
+```
+
+### Contracts
+
+Pond will deploy a set of Kujira core contracts on its first start. If you want addtional contracts, you can provide the list with:
+
+```text
+pond init --contracts kujira
+```
+
+Or deploy none:
+
+```text
+pond init --no-contracts
+```
+
+### Listen Address
+
+Pond will forward all necessary ports to `localhost`. If you want to make your pond available from outside your machine and make it available for others, you can provide an ip address to bind to:
+
+```text
+pond init --listen 1.2.3.4
+```
+
+### Unbonding Time
+
+The default unbonding time is set to 14 days. If you need to test staking related scenarios, you can set a custom time (in seconds).
+
+Beware that this affects the IBC relayer and will freeze the clients if your Pond is stopped for a longer than the provided time.
+
+```text
+pond init --unbonding-time 300
+```
+
+### API/RPC URLs
+
+Pond uses the [cosmos.directory](https://cosmos.directory/kujira) proxy to get data from public API/RPC nodes. Override them with:
+
+```text
+node init --api-url https://my.api.node
+```
+
+```text
+node init --rpc-url https://my.rpc.node
+```
+
+## Start
+
+Start your Pond
+
+```text
 pond start
 ```
 
-### Stop pond
+## Stop
 
-```bash
+Stop your Pond
+
+```text
 pond stop
 ```
 
-### Show pond information
+## Info
 
-```bash
-pond info
-```
+Retrieve infrastructure information
 
-## Accounts
+### Accounts
 
-### Pre-funded test wallets
-
-kujira1cyyzpxplxdzkeea7kwsydadg87357qnaww84dg
+List all accounts and their addresses
 
 ```text
+$ pond info accounts
+chain  name     address
+kujira deployer kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse
+kujira relayer  kujira1egssdw6et0pwdcdzl4nvyck68g3qcru99ynkjr
+kujira test0    kujira1cyyzpxplxdzkeea7kwsydadg87357qnaww84dg
+kujira test1    kujira18s5lynnmx37hq4wlrw9gdn68sg2uxp5r39mjh5
+```
+
+### Seed Phrase
+
+List the seed phrase of a specific account
+
+```text
+$ pond info seed test0
 notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius
 ```
 
-kujira18s5lynnmx37hq4wlrw9gdn68sg2uxp5r39mjh5
+### Codes
+
+List all deployed code ids and associated names
 
 ```text
-quality vacuum heart guard buzz spike sight swarm shove special gym robust assume sudden deposit grid alcohol choice devote leader tilt noodle tide penalty
+$ pond info codes
+id checksum          name
+ 1 418CF9A2…B2DFAA22 kujira_bow_xyk
+ 2 715934C4…49E9A7E9 kujira_bow_lsd
+ 3 F3B81230…9ABCC502 kujira_bow_stable
+ 4 98CC2EDA…CFF50C5F kujira_stable_mint
+ 5 8A6FA03E…BD42C198 kujira_fin
 ```
 
-kujira1qwexv7c6sm95lwhzn9027vyu2ccneaqa5xl0d9
+### Contracts
+
+List all deployed contracts by code id
 
 ```text
-symbol force gallery make bulk round subway violin worry mixture penalty kingdom boring survey tool fringe patrol sausage hard admit remember broken alien absorb
+$ pond info contracts
+id address                                                           label
+ 1 kujira1e8rl4aawc44c2kqrx6urxktsf9h8k9sg9yufaxgegge2sn85vx7sdek0cz Bow ETH-USK
+ 1 kujira1narj7rjhmth6hzk8rmd3sqeus293tpj7r35n0dlm6lgle6zuevusl43a5j Bow KUJI-USK
+ 2 kujira1xfm4hyctm8zxjtjw7lsvtewnks36pekzt4x9fjjvhm8tr23vj42qp8m3au USK Controller
+ 3 kujira1gze5anmdc34plj9vaku3mn2cdurhd6r2680fr2xhvdcp32jzwl4q4t752w Fin ETH-USK
+ 3 kujira1nc8c8zktapz5y25jqfw4dlu8u0z0m2j5lhv4djrahvtr2dgekceqww683c Fin KUJI-USK
+ 3 kujira1ttcd5lk9xw2kenzxh7060h8ehyklqp5rx92j9p0ux36vsjhhrx9qmqr896 Fin USDC-USK
+ 3 kujira17gr3fgpwes8q8y0gt6rqjnqwe7p4dpel85nu57epedujdmuhug7sexs9fd Fin stETH-ETH
+ 4 kujira1pz4z5kakz60z738ghu4v8sc6qumuxcrezxafqhmzh77lw88y0vmqhu03uz Bow stETH-ETH
+ 5 kujira1yzd7hwez9yntpc3z34qcx5c7gduw65qk92a88u2pgpw0cxgdq7lsleea3r Bow USDC-USK
 ```
 
-kujira14hcxlnwlqtq75ttaxf674vk6mafspg8xhmzm0f
+### URLs
+
+List all chain and node specific URLs
 
 ```text
-bounce success option birth apple portion aunt rural episode solution hockey pencil lend session cause hedgehog slender journey system canvas decorate razor catch empty
+$ pond info urls
+kujira1-1
+ api    http://127.0.0.1:11117
+ rpc    http://127.0.0.1:11157
+ grpc   http://127.0.0.1:11190
+ feeder http://127.0.0.1:11171/api/v1/prices
 ```
 
-kujira12rr534cer5c0vj53eq4y32lcwguyy7nn5c753n
+## Tx
+
+Do Transaction on any of your chains. It will send the transaction to `kujira-1`if no `--chain-id` is provided.
 
 ```text
-second render cat sing soup reward cluster island bench diet lumber grocery repeat balcony perfect diesel stumble piano distance caught occur example ozone loyal
+pond tx ibc-transfer transfer transfer channel-0 cosmos18s5lynnmx37hq4wlrw9gdn68sg2uxp5rqde267 123456789ukuji --from test0
 ```
 
-kujira1nt33cjd5auzh36syym6azgc8tve0jlvkxq3kfc
+## Query
+
+Query any of your chains. It will query `kujira-1` by default if you don't provide a `--chain-id`.
 
 ```text
-spatial forest elevator battle also spoon fun skirt flight initial nasty transfer glory palm drama gossip remove fan joke shove label dune debate quick
+$ pond q bank balances cosmos18s5lynnmx37hq4wlrw9gdn68sg2uxp5rqde267 --chain-id cosmoshub-1
+balances:
+- amount: "123456789"
+  denom: ibc/90F27756D300141BDF07B83E65401BDC58C05269B9BAE3ECB0B20FAB166BCF8F
+- amount: "1000000000000"
+  denom: uatom
+pagination:
+  next_key: null
+  total: "0"
 ```
 
-kujira10qfrpash5g2vk3hppvu45x0g860czur8s69vah
+## Government
+
+Submit a gov proposal and optionally let all validators vote with the specified option.
 
 ```text
-noble width taxi input there patrol clown public spell aunt wish punch moment will misery eight excess arena pen turtle minimum grain vague inmate
+pond gov submit-proposal my-proposal.json
 ```
-
-kujira1f4tvsdukfwh6s9swrc24gkuz23tp8pd3qkjuj9
 
 ```text
-cream sport mango believe inhale text fish rely elegant below earth april wall rug ritual blossom cherry detail length blind digital proof identify ride
+pond gov submit-proposal my-proposal.json --vote yes
 ```
 
-kujira1myv43sqgnj5sm4zl98ftl45af9cfzk7nwph6m0
+## Deploy
+
+Deploy local wasm binaries or execute [plan files](##Planfiles) (a way to automate contract deployments)
 
 ```text
-index light average senior silent limit usual local involve delay update rack cause inmate wall render magnet common feature laundry exact casual resource hundred
+pond deploy myapp.wasm
 ```
-
-kujira14gs9zqh8m49yy9kscjqu9h72exyf295asmt7nw
 
 ```text
-prefer forget visit mistake mixture feel eyebrow autumn shop pair address airport diesel street pass vague innocent poem method awful require hurry unhappy shoulder
+pond deploy myplan.json
 ```
+
+## Code Registry
+
+For the plan deployment to work, Pond stores the required wasm code information in the code registry and maps it to a human readable name which is needed in the plan files.
+
+It ships with a default registry, containing most of the Kujira core apps and can be managed by using `pond registry` commands or editing `$HOME/.pond/registry.json` manually.
+
+Every binary that is deployed via `pond deploy` will automatically added to the registry and referenced to its basename, so it can immediately be used for plan file deployments.
+
+### Management
+
+#### Update
+
+Update the registry entry, in case the name or location of a code has changed
+
+```text
+pond registry update myapp.wasm --name myapp --source file:///tmp/myapp.wasm
+```
+
+#### Export / Import
+
+In case you want to set up a new pond or apply your plan file on a different Pond, you can export your current registry and import it again
+
+```text
+pond export /tmp/myregistry.json
+```
+
+```text
+pond import /tmp/myregistry.json
+```
+
+### Available sources
+
+#### Mainnet
+
+This downloads and deploys the code with the given code id from Kujira mainnet
+
+```json
+{
+  "mycode": {
+    "source": "kaiyo-1://12345"
+  }
+}
+```
+
+### Local Disk
+
+This deploys locally stored code
+
+```json
+{
+  "mycode": {
+    "source": "file:///tmp/12345.wasm"
+  }
+}
+```
+
+## Planfiles
+
+To make complex smart contract deployments easy to maintain, Pond offers the possibility to describe the order and parameters of your contract deployments and required denoms in json files and execute them. Pond then takes care of the creation of needed denoms and wasm code deployments as well as the instantiation of the contracts and needed contract executions. It keeps track all items and lets you access certain properties like contract address or denom path in every subsequent deployment via a simple template string (see "Planfile Syntax" for explanation).
+
+Default plan files shipped with pond can be found in `$HOME/.pond/planfiles`.
+
+```json
+{
+  "denom": "{{ .Denoms.USDC.Path }}",
+  "address": "{{ .Contracts.my_contract.Address }}"
+}
+```
+
+All deployments are done from the `deployer` account: `kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse`
+
+### Syntax
+
+Plan files are simple json files that describe denoms and contract instantiations. They are designed to be as simple as possible and use the same instantiation message like the one that is used when executing it manually via `kujirad wasm execute`.
+
+#### Denoms
+
+Pond creates denoms that have a provided `nonce` as `factory/kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse/{nonce}` from the `deployer` account. If `mint` is provided, it will also mint the specified amount of tokens into each `test*` account. All denoms with a provided `path` will be skipped.
+
+Example:
+
+```json
+{
+  "denoms": [
+    {
+      "name": "KUJI",
+      "path": "ukuji"
+    },
+    {
+      "name": "USDC",
+      "nonce": "ibc/FE98AA...9576A9"
+    },
+    {
+      "name": "POND",
+      "nonce": "upond",
+      "mint": "10_000_000"
+    },
+  ]
+}
+```
+
+The above example will create the `POND` token as `factory/kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse/upond` and mint 10 `POND` (10m upond) into each test wallet. `KUJI` and `USDC` have a path provided and therefore will be skipped.
+
+It stores the path of all three denoms, which can be accessed in subsequent contract instantiations of that deployment via `{{ .Denoms.POND.Address }}` for example.
+
+#### Contracts
+
+Pond instantiates all contracts from the `deployer` account, which also is set as the owner by default.
+
+To speed up the deployments, Pond handles contracts in batches which combine all instantiations into a single transaction:
+
+```json
+{
+  "contracts": [
+    [
+      {"name": "contract1", "msg": {}},
+      {"name": "contract2", "msg": {}}
+    ],
+    [
+      {"name": "contract3", "msg": {}}
+    ]
+  ]
+}
+```
+
+The above example executes two batches. The first creating contract1 and contract2 in one transaction, the second creating contract3.
+
+This way you speed up the deployment by maintaing a specific order of instantiations, if needed.
+
+##### name
+
+The name of your contract inside the plan file deployment run. This is needed to be able to refer to the contract in later instantiations.
+
+##### code
+
+The name of the wasm code stored in the registry. Pond will deploy the code, if it hasn't been yet.
+
+##### label
+
+A label for the newly created contract.
+
+##### msg
+
+The instantiation message needed to create the new contract.
+
+##### funds
+
+Some contracts need to be provided some amount of funds when they are created.
+
+##### creates
+
+Some contracts create tokens on their instantiation. To be able for Pond to make them usable in further steps, it needs to know their names.
+
+##### actions
+
+You can specify `/cosmwasm.wasm.v1.MsgExecuteContract` messages that are triggered after the contract is instantiated. This is useful, if you need to grant permissions for the newly created contract to a different contract for example.
+
+### Example
+
+The following example is a part of the `kujira` plan file, that is shipped and applied by default on the first start of each Pond instance (can be disabled with `--no-contracts`). It should showcase the use of the deployment order and templating.
+
+```json
+{
+  "denoms": [
+    {
+      "name": "KUJI",
+      "path": "ukuji"
+    }
+  ],
+  "contracts": [
+    [
+      {
+        "name": "kujira_stable_mint_usk",
+        "code": "kujira_stable_mint",
+        "label": "USK Controller",
+        "funds": "10000000ukuji",
+        "msg": {
+          "denom": "uusk"
+        },
+        "creates": [
+          {
+            "name": "USK",
+            "nonce": "uusk"
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "name": "kujira_fin_kuji_usk",
+        "code": "kujira_fin",
+        "label": "Fin KUJI-USK",
+        "msg": {
+          "denoms": [
+            {
+              "native": "{{ .Denoms.KUJI.Path }}"
+            },
+            {
+              "native": "{{ .Denoms.USK.Path }}"
+            }
+          ],
+          "price_precision": {
+            "decimal_places": 4
+          },
+          "decimal_delta": 0,
+          "fee_taker": "0.0015",
+          "fee_maker": "0.00075"
+        }
+      }
+    ],
+    [
+      {
+        "name": "kujira_bow_kuji_usk",
+        "code": "kujira_bow_xyk",
+        "label": "Bow KUJI-USK",
+        "funds": "10000000ukuji",
+        "msg": {
+          "fin_contract": "{{ .Contracts.kujira_fin_kuji_usk.Address }}",
+          "intervals": [
+            "0.01",
+            "0.05"
+          ],
+          "fee": "0.1",
+          "amp": "1"
+        }
+      }
+    ]
+  ]
+}
+```
+
+In the above example plan file, Pond will at first check if it can find the referenced wasm codes in the code registry and deploy them if can't find them on-chain.
+
+Next, it will create all tokens that have a provided `nonce` but no `path`. In this example, it crates no denom, because KUJI is provided with a `path`.
+
+Now that all codes are deployed and needed denoms are created, it instantiates the "USK Controller". That will instantly create the USK token and therefore needs some initial `funds`. To be able to refer to the newly created USK address later, Pond retrieves and stores the path of all assets listed in the `creates` section.
+
+It then instantiates a KUJI/USK Fin market and uses the retrieved path from the USK token, created before.
+
+Last but not least it creates a Bow pool by referencing to the KUJI/USK Fin market via its name: `kujira_fin_kuji_usk`.

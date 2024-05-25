@@ -1,0 +1,419 @@
+{
+  "denoms": [
+    {
+      "name": "KUJI",
+      "path": "ukuji"
+    },
+    {
+      "name": "USDC",
+      "nonce": "uusdc",
+      "mint": "100_000_000_000"
+    },
+    {
+      "name": "ETH",
+      "nonce": "aeth",
+      "mint": "10_000_000_000_000_000_000"
+    },
+    {
+      "name": "stETH",
+      "nonce": "asteth",
+      "mint": "10_000_000_000_000_000_000"
+    }
+  ],
+  "contracts": [
+    [
+      {
+        "name": "kujira_stable_mint_usk",
+        "code": "kujira_stable_mint",
+        "label": "USK Controller",
+        "funds": "10000000ukuji",
+        "msg": {
+          "denom": "uusk"
+        },
+        "creates": [
+          {
+            "name": "USK",
+            "nonce": "uusk"
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "name": "kujira_ghost_vault_usk",
+        "code": "kujira_ghost_vault",
+        "label": "Ghost Vault USK",
+        "funds": "20000000ukuji",
+        "msg": {
+          "denom": "{{ .Denoms.USK.Path }}",
+          "oracle": {
+            "static": "1"
+          },
+          "decimals": 6,
+          "denom_creation_fee": "10000000",
+          "utilization_to_curve": [
+            [
+              "0",
+              {
+                "linear": {
+                  "start": [
+                    "0",
+                    "0.01"
+                  ],
+                  "end": [
+                    "0.8",
+                    "0.1"
+                  ]
+                }
+              }
+            ],
+            [
+              "0.8",
+              {
+                "linear": {
+                  "start": [
+                    "0.8",
+                    "0.1"
+                  ],
+                  "end": [
+                    "1",
+                    "3"
+                  ]
+                }
+              }
+            ]
+          ]
+        },
+        "creates": [
+          {
+            "name": "xUSK",
+            "nonce": "urcpt"
+          },
+          {
+            "name": "debtUSK",
+            "nonce": "udebt"
+          }
+        ]
+      },
+      {
+        "name": "kujira_fin_kuji_usk",
+        "code": "kujira_fin",
+        "label": "Fin KUJI-USK",
+        "msg": {
+          "denoms": [
+            {
+              "native": "{{ .Denoms.KUJI.Path }}"
+            },
+            {
+              "native": "{{ .Denoms.USK.Path }}"
+            }
+          ],
+          "price_precision": {
+            "decimal_places": 4
+          },
+          "decimal_delta": 0,
+          "fee_taker": "0.0015",
+          "fee_maker": "0.00075"
+        }
+      },
+      {
+        "name": "kujira_fin_steth_eth",
+        "code": "kujira_fin",
+        "label": "Fin stETH-ETH",
+        "msg": {
+          "denoms": [
+            {
+              "native": "{{ .Denoms.stETH.Path }}"
+            },
+            {
+              "native": "{{ .Denoms.ETH.Path }}"
+            }
+          ],
+          "price_precision": {
+            "decimal_places": 4
+          },
+          "decimal_delta": 0,
+          "fee_taker": "0.0015",
+          "fee_maker": "0.00075"
+        }
+      },
+      {
+        "name": "kujira_fin_eth_usk",
+        "code": "kujira_fin",
+        "label": "Fin ETH-USK",
+        "msg": {
+          "denoms": [
+            {
+              "native": "{{ .Denoms.ETH.Path }}"
+            },
+            {
+              "native": "{{ .Denoms.USK.Path }}"
+            }
+          ],
+          "price_precision": {
+            "decimal_places": 4
+          },
+          "decimal_delta": 12,
+          "fee_taker": "0.0015",
+          "fee_maker": "0.00075"
+        }
+      },
+      {
+        "name": "kujira_fin_usdc_usk",
+        "code": "kujira_fin",
+        "label": "Fin USDC-USK",
+        "msg": {
+          "denoms": [
+            {
+              "native": "{{ .Denoms.USDC.Path }}"
+            },
+            {
+              "native": "{{ .Denoms.USK.Path }}"
+            }
+          ],
+          "price_precision": {
+            "decimal_places": 6
+          },
+          "decimal_delta": 0,
+          "fee_taker": "0.0015",
+          "fee_maker": "0.00075"
+        }
+      },
+      {
+        "name": "kujira_orca_eth_usk",
+        "code": "kujira_orca",
+        "label": "Orca ETH-USK",
+        "msg": {
+          "bid_denom": "{{ .Denoms.USK.Path }}",
+          "collateral_denom": "{{ .Denoms.ETH.Path }}",
+          "bid_threshold": "10000000000",
+          "max_slot": 30,
+          "premium_rate_per_slot": "0.01",
+          "waiting_period": 10,
+          "liquidation_fee": "0.01",
+          "withdrawal_fee": "0.005",
+          "fee_address": "kujira17xpfvakm2amg962yls6f84z3kell8c5lp3pcxh"
+        }
+      },
+      {
+        "name": "kujira_bow_staking",
+        "code": "kujira_bow_staking",
+        "label": "Bow Staking",
+        "msg": {
+          "incentive_fee": {
+            "amount": "1000000",
+            "denom": "{{ .Denoms.USK.Path }}"
+          },
+          "incentive_min": "1000000"
+        }
+      }
+    ],
+    [
+      {
+        "name": "kujira_bow_kuji_usk",
+        "code": "kujira_bow_xyk",
+        "label": "Bow KUJI-USK",
+        "funds": "10000000ukuji",
+        "msg": {
+          "fin_contract": "{{ .Contracts.kujira_fin_kuji_usk.Address }}",
+          "intervals": [
+            "0.001",
+            "0.005",
+            "0.005",
+            "0.01",
+            "0.01",
+            "0.05",
+            "0.1",
+            "0.2"
+          ],
+          "fee": "0.1",
+          "amp": "1"
+        },
+        "actions": [
+          {
+            "contract": "{{ .Contracts.kujira_fin_kuji_usk.Address }}",
+            "msg": {
+              "launch": {}
+            }
+          }
+        ]
+      },
+      {
+        "name": "kujira_bow_steth_eth",
+        "code": "kujira_bow_lsd",
+        "label": "Bow stETH-ETH",
+        "funds": "10000000ukuji",
+        "msg": {
+          "fin_contract": "{{ .Contracts.kujira_fin_steth_eth.Address }}",
+          "adapter": {
+            "oracle": [
+              {
+                "denom": "STETH",
+                "decimals": 6
+              },
+              {
+                "denom": "ETH",
+                "decimals": 6
+              }
+            ]
+          },
+          "strategy": {
+            "bid_fee": "0.005",
+            "bid_factor": "0.001",
+            "bid_utilization": "0.8",
+            "bid_count": 20,
+            "ask_fee": "0.001",
+            "ask_utilization": "1"
+          }
+        },
+        "actions": [
+          {
+            "contract": "{{ .Contracts.kujira_fin_steth_eth.Address }}",
+            "msg": {
+              "launch": {}
+            }
+          }
+        ]
+      },
+      {
+        "name": "kujira_bow_eth_usk",
+        "code": "kujira_bow_xyk",
+        "label": "Bow ETH-USK",
+        "funds": "10000000ukuji",
+        "msg": {
+          "fin_contract": "{{ .Contracts.kujira_fin_eth_usk.Address }}",
+          "intervals": [
+            "0.02",
+            "0.02",
+            "0.02",
+            "0.05",
+            "0.1",
+            "0.2"
+          ],
+          "fee": "0.1",
+          "amp": "1"
+        },
+        "actions": [
+          {
+            "contract": "{{ .Contracts.kujira_fin_eth_usk.Address }}",
+            "msg": {
+              "launch": {}
+            }
+          }
+        ]
+      },
+      {
+        "name": "kujira_bow_usdc_usk",
+        "code": "kujira_bow_stable",
+        "label": "Bow USDC-USK",
+        "funds": "10000000ukuji",
+        "msg": {
+          "fin_contract": "{{ .Contracts.kujira_fin_usdc_usk.Address }}",
+          "strategy": {
+            "target_price": "1",
+            "ask_fee": "0.001",
+            "ask_factor": "0.0005",
+            "ask_utilization": "0.8",
+            "ask_count": 15,
+            "bid_fee": "0.001",
+            "bid_factor": "0.0005",
+            "bid_utilization": "0.8",
+            "bid_count": 15
+          }
+        },
+        "actions": [
+          {
+            "contract": "{{ .Contracts.kujira_fin_usdc_usk.Address }}",
+            "msg": {
+              "launch": {}
+            }
+          }
+        ]
+      },
+      {
+        "name": "kujira_market_eth_usk",
+        "code": "kujira_stable_market",
+        "label": "USK Market ETH",
+        "msg": {
+          "stable_denom": "{{ .Denoms.USK.Path }}",
+          "stable_denom_admin": "{{ .Contracts.kujira_stable_mint_usk.Address }}",
+          "collateral_denom": "{{ .Denoms.ETH.Path }}",
+          "collateral_denom_decimal_delta": 12,
+          "oracle_denom": "ETH",
+          "max_ratio": "0.6",
+          "mint_fee": "0.001",
+          "interest_rate": "0.01",
+          "orca_address": "{{ .Contracts.kujira_orca_eth_usk.Address }}",
+          "max_debt": "1000000000000",
+          "liquidation_threshold": "1000000000",
+          "liquidation_ratio": "0.1",
+          "fee_address": "kujira17xpfvakm2amg962yls6f84z3kell8c5lp3pcxh"
+        },
+        "actions": [
+          {
+            "contract": "{{ .Contracts.kujira_stable_mint_usk.Address }}",
+            "msg": {
+              "permit": {
+                "address": "{{ .Contracts.kujira_market_eth_usk.Address }}"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "kujira_orca_usk_kuji",
+        "code": "kujira_orca",
+        "label": "Orca USK-KUJI",
+        "msg": {
+          "bid_denom": "{{ .Denoms.USK.Path }}",
+          "collateral_denom": "{{ .Denoms.KUJI.Path }}",
+          "bid_threshold": "10000000000",
+          "max_slot": 30,
+          "premium_rate_per_slot": "0.01",
+          "waiting_period": 10,
+          "liquidation_fee": "0.01",
+          "withdrawal_fee": "0.005",
+          "fee_address": "kujira17xpfvakm2amg962yls6f84z3kell8c5lp3pcxh"
+        }
+      }
+    ],
+    [
+      {
+        "name": "kujira_ghost_market_usk_kuji",
+        "code": "kujira_ghost_market",
+        "label": "Ghost Market USK-KUJI",
+        "msg": {
+          "vault_addr": "{{ .Contracts.kujira_ghost_vault_usk.Address }}",
+          "orca_addr": "{{ .Contracts.kujira_orca_usk_kuji.Address }}",
+          "collateral_denom": "{{ .Denoms.KUJI.Path }}",
+          "collateral_oracle_denom": "KUJI",
+          "collateral_decimals": 6,
+          "max_ltv": "0.5",
+          "full_liquidation_threshold": "1000000",
+          "partial_liquidation_target": "0.4",
+          "borrow_fee": "0.002",
+          "fee_address": "kujira17xpfvakm2amg962yls6f84z3kell8c5lp3pcxh"
+        },
+        "actions": [
+          {
+            "contract": "{{ .Contracts.kujira_orca_usk_kuji.Address }}",
+            "msg": {
+              "add_market": {
+                "address": "{{ .Contracts.kujira_ghost_market_usk_kuji.Address }}"
+              }
+            }
+          },
+          {
+            "contract": "{{ .Contracts.kujira_ghost_vault_usk.Address }}",
+            "msg": {
+              "whitelist_market": {
+                "market": "{{ .Contracts.kujira_ghost_market_usk_kuji.Address }}",
+                "borrow_limit": "1000000000000"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  ]
+}

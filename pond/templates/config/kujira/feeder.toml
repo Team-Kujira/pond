@@ -1,0 +1,67 @@
+history_db = "/home/feeder/feeder.db"
+
+[server]
+listen_addr = "0.0.0.0:{{ .Port }}"
+read_timeout = "20s"
+verbose_cors = true
+write_timeout = "20s"
+
+[[deviation_thresholds]]
+base = "USDT"
+threshold = "2"
+
+[[currency_pairs]]
+base = "BTC"
+quote = "USDT"
+providers = ["binance", "bitget", "lbank", "mexc", "okx", "xt"]
+
+[[currency_pairs]]
+base = "ETH"
+quote = "USDT"
+providers = ["binance", "bitget", "lbank", "mexc", "okx", "xt"]
+
+[[currency_pairs]]
+base = "STETH"
+quote = "USDT"
+providers = ["bybit", "okx", "bitget", "gate"]
+
+[[currency_pairs]]
+base = "USDT"
+quote = "USD"
+providers = ["binanceus", "crypto", "gate", "kraken"]
+
+[[currency_pairs]]
+base = "USK"
+quote = "USDC"
+providers = ["finv2"]
+
+[[currency_pairs]]
+base = "KUJI"
+quote = "USDC"
+providers = ["finv2"]
+
+[[currency_pairs]]
+base = "USDC"
+quote = "USDT"
+providers = ["binance", "bybit", "huobi", "kucoin", "lbank"]
+
+[[provider_min_overrides]]
+denoms = ["USK", "KUJI"]
+providers = 1
+
+[[provider_endpoints]]
+name = "finv2"
+urls = [
+    "https://kujira.api.kjnodes.com",
+    "https://kujira-api.lavenderfive.com",
+    "https://kujira-rest.publicnode.com",
+    "https://rest-kujira.ecostake.com",
+    "https://kujira-api.ibs.team",
+    "https://lcd-kujira.whispernode.com",
+    "https://api-kujira.mms.team",
+    "https://api-kujira.starsquid.io",
+]
+
+[contract_addresses.finv2]
+USDCUSK = "kujira15a657mgszm30vdhytpmfslcyc4cztn5lsuv9rxzwdqmuwgd8znps8l3yy2"
+KUJIUSDC = "kujira1pw96huy6z02uk8hdpruk6g8u700dp8yxjhp46c24rwkzay2lfd3quqdum5"
