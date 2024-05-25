@@ -27,8 +27,6 @@ pagination:
   total: "4"
 ```
 
-### Deposit
-
 To be able to use that ETH as collateral, we need to deposit some of it into the USK contract `USK Market ETH`. You can find the address with `pond info contracts`.
 
 ```text
@@ -46,8 +44,6 @@ data:
   mint_amount: "0"
   owner: kujira1cyyzpxplxdzkeea7kwsydadg87357qnaww84dg
 ```
-
-### Mint
 
 Now that we have verified that the ETH has arrived in the contract, we can mint (borrow) USK for it:
 
@@ -80,16 +76,6 @@ Now with 4995 USK in our wallet, why not providing some liquidity for the KUJI-U
 
 ```text
 pond tx wasm execute kujira1narj7rjhmth6hzk8rmd3sqeus293tpj7r35n0dlm6lgle6zuevusl43a5j '{"deposit":{}}' --from test0 --amount 2000000000factory/kujira1xfm4hyctm8zxjtjw7lsvtewnks36pekzt4x9fjjvhm8tr23vj42qp8m3au/uusk,1000000000ukuji --gas auto --gas-adjustment 2
-```
-
-To receive fees from our LP position, we also need to stake the LP tokens we just received (`1414213562factory/kujira1narj7rjhmth6hzk8rmd3sqeus293tpj7r35n0dlm6lgle6zuevusl43a5j/ulp`)
-
-```text
-pond tx wasm execute kujira1wun86nqrwl5cnggsf37pujztlr824c6u3ssnr0akduz74u4ctp7s8x7hf4 '{"stake":{"addr":"kujira1cyyzpxplxdzkeea7kwsydadg87357qnaww84dg"}}' --from test0 --amount 1414213562factory/kujira1narj7rjhmth6hzk8rmd3sqeus293tpj7r35n0dlm6lgle6zuevusl43a5j/ulp --gas auto --gas-adjustment 2
-```
-
-```text
-pond q wasm contract-state smart kujira1wun86nqrwl5cnggsf37pujztlr824c6u3ssnr0akduz74u4ctp7s8x7hf4 '{"fills":{"denom":"factory/kujira1narj7rjhmth6hzk8rmd3sqeus293tpj7r35n0dlm6lgle6zuevusl43a5j/ulp","addr":"kujira1cyyzpxplxdzkeea7kwsydadg87357qnaww84dg"}}'
 ```
 
 ## Lend
@@ -133,6 +119,8 @@ balances:
 pagination:
   total: "5"
 ```
+
+## Swap
 
 Lets just buy some more KUJI with it at market price:
 
