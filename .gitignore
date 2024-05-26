@@ -1,1 +1,6 @@
 .vscode
+main
+build
+/*.json
+/*.py
+test-*

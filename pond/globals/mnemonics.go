@@ -1,0 +1,25 @@
+package globals
+
+var Mnemonics = map[string]string{
+	"validator1": "symbol rebuild hotel chief ensure hand coach veteran include feature paper flavor define wing hood valve field roast ridge rural advance suggest chunk eye",
+	"validator2": "goddess build dragon recall orbit online try check athlete zero farm letter emerge midnight face forget rate swing mimic patient head game ill anger",
+	"validator3": "kingdom another behind equip when miracle apart bulb rebuild square ensure witness dumb glue notable attitude dream inherit monitor desk famous wrong tired hat",
+	"validator4": "grant tragic cream duty almost heart unveil crystal addict trim weekend lazy tragic segment beauty devote medal cement dirt coach flame hair say quality",
+	"validator5": "brother tomato slogan pistol aware stamp govern spot shrimp prepare flag skate fever dance same wheel half student often divorce agent fine faint tunnel",
+	"validator6": "erode island dragon twice retire sting tone giant treat mention language right tray spare virus grass chase lunar grant company strong unfair since ahead",
+	"validator7": "desert oppose merit anxiety federal doll public oppose injury loop select ribbon devote wink exile frown fix safe into amount clinic food opera victory",
+	"validator8": "leopard couch refuse cable quality glue bundle monster never output teach firm filter beef raise valid sting shrug mother puzzle attend squeeze segment aunt",
+	"validator9": "upper ten air click easy jelly unique submit jewel follow siren live gadget oyster poverty sister course lemon mad cupboard enter nature reject idea",
+	"test0":      "notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius",
+	"test1":      "quality vacuum heart guard buzz spike sight swarm shove special gym robust assume sudden deposit grid alcohol choice devote leader tilt noodle tide penalty",
+	"test2":      "symbol force gallery make bulk round subway violin worry mixture penalty kingdom boring survey tool fringe patrol sausage hard admit remember broken alien absorb",
+	"test3":      "bounce success option birth apple portion aunt rural episode solution hockey pencil lend session cause hedgehog slender journey system canvas decorate razor catch empty",
+	"test4":      "second render cat sing soup reward cluster island bench diet lumber grocery repeat balcony perfect diesel stumble piano distance caught occur example ozone loyal",
+	"test5":      "spatial forest elevator battle also spoon fun skirt flight initial nasty transfer glory palm drama gossip remove fan joke shove label dune debate quick",
+	"test6":      "noble width taxi input there patrol clown public spell aunt wish punch moment will misery eight excess arena pen turtle minimum grain vague inmate",
+	"test7":      "cream sport mango believe inhale text fish rely elegant below earth april wall rug ritual blossom cherry detail length blind digital proof identify ride",
+	"test8":      "index light average senior silent limit usual local involve delay update rack cause inmate wall render magnet common feature laundry exact casual resource hundred",
+	"test9":      "prefer forget visit mistake mixture feel eyebrow autumn shop pair address airport diesel street pass vague innocent poem method awful require hurry unhappy shoulder",
+	"relayer":    "two detail rare vivid evil essence almost similar tattoo thing rabbit thought alert brick snap tumble dust sail eternal vapor aim finger paddle silver",
+	"deployer":   "box tail afraid victory scout bottom later indoor wave exhaust hybrid try artist narrow room pudding idle human again pupil method can tomorrow taxi",
+}
