@@ -325,17 +325,48 @@ func (p *Pond) CreateNetwork() error {
 	return nil
 }
 
-func (p *Pond) RemoveNetwork() error {
+func (p *Pond) CheckNetworkExists() (bool, error) {
 	var command []string
 
 	switch p.config.Command {
 	case "docker":
 		command = []string{
-			p.config.Command, "network", "rm", "-f", "pond",
+			p.config.Command, "network", "ls", "-f", "name=pond", "-q",
 		}
 	}
 
-	err := utils.Run(p.logger, command)
+	output, err := utils.RunO(p.logger, command)
+	if err != nil {
+		return false, err
+	}
+
+	if len(output) > 0 {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (p *Pond) RemoveNetwork() error {
+	var command []string
+
+	exists, err := p.CheckNetworkExists()
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		return nil
+	}
+
+	switch p.config.Command {
+	case "docker":
+		command = []string{
+			p.config.Command, "network", "rm", "pond",
+		}
+	}
+
+	err = utils.Run(p.logger, command)
 	if err != nil {
 		return err
 	}
