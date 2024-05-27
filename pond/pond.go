@@ -58,6 +58,11 @@ func NewPond(logLevel string) (Pond, error) {
 		return Pond{}, err
 	}
 
+	err = utils.Run(logger, []string{"docker", "info"})
+	if err != nil {
+		return Pond{}, err
+	}
+
 	pond := Pond{
 		logger: logger,
 		home:   home + "/.pond",
