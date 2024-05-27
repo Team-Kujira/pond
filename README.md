@@ -8,7 +8,7 @@ Because Pond is meant to help builders on Kujira, its first and default chain wi
 
 ## Installation
 
-Requires golang `>=1.21`
+Requires [docker](https://www.docker.com) and [golang](https://go.dev) `>=1.21`
 
 ```text
 make install
