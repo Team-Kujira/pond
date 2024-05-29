@@ -163,7 +163,7 @@ func (d *Deployer) Deploy(filenames []string) error {
 		contentType := http.DetectContentType(buf)
 
 		switch contentType {
-		case "text/plain; charset=utf-8":
+		case "text/plain; charset=utf-8", "application/octet-stream":
 			// return d.DeployPlanfiles([]string{filename})
 			err := d.LoadPlanFile(filename)
 			if err != nil {
@@ -677,7 +677,10 @@ func (d *Deployer) CreateContractMsgs(
 			return nil, d.error(err)
 		}
 
-		msg := buffer.Bytes()
+		msg, err := d.Convert(buffer.Bytes())
+		if err != nil {
+			return nil, err
+		}
 
 		funds, err := d.StringToFunds(contract.Funds)
 		if err != nil {
@@ -1193,4 +1196,32 @@ func (d *Deployer) StringToFunds(str string) ([]Funds, error) {
 	})
 
 	return funds, nil
+}
+
+func (d *Deployer) Convert(data []byte) ([]byte, error) {
+	raw := json.RawMessage(data)
+
+	data, err := json.Marshal(raw)
+	if err != nil {
+		return nil, d.error(err)
+	}
+
+	buffer := new(bytes.Buffer)
+	err = json.Compact(buffer, data)
+	if err != nil {
+		return nil, d.error(err)
+	}
+
+	regex := regexp.MustCompile(`^(.*)"(([^"])\s*\|\s*int\s*)"(.*)$`)
+
+	parts := strings.Split(buffer.String(), ":")
+	for i, p := range parts {
+		matches := regex.FindStringSubmatch(p)
+		if len(matches) != 5 {
+			continue
+		}
+		parts[i] = matches[1] + matches[3] + matches[4]
+	}
+
+	return []byte(strings.Join(parts, ":")), nil
 }
