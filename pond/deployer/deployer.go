@@ -28,6 +28,7 @@ type Deployer struct {
 	node      node.Node
 	Denoms    map[string]Denom
 	Contracts map[string]Contract
+	CodeIds   map[string]string
 	addresses map[string]struct{}
 	codes     map[string]string
 	plan      Plan
@@ -778,6 +779,14 @@ func (d *Deployer) UpdateDeployedCodes() error {
 			d.codes[code.DataHash] = code.CodeId
 		}
 
+		for name, code := range d.registry {
+			codeId, found := d.codes[code.Checksum]
+			if !found {
+				continue
+			}
+			d.CodeIds[name] = codeId
+		}
+
 		key = info.Pagination.NextKey
 	}
 
@@ -1143,7 +1152,21 @@ func (d *Deployer) StringToFunds(str string) ([]Funds, error) {
 		return funds, nil
 	}
 
-	regex := regexp.MustCompile(`^(\d+)([/A-Za-z0-1]+)$`)
+	tmpl, err := template.New("").Parse(str)
+	if err != nil {
+		return nil, d.error(err)
+	}
+
+	var buffer bytes.Buffer
+
+	err = tmpl.Execute(&buffer, d)
+	if err != nil {
+		return nil, d.error(err)
+	}
+
+	str = buffer.String()
+
+	regex := regexp.MustCompile(`^(\d+)([/A-Za-z0-9]+)$`)
 
 	for _, part := range strings.Split(str, ",") {
 		matches := regex.FindStringSubmatch(part)

@@ -110,7 +110,7 @@ func (p *Pond) init() error {
 
 	accounts := []string{}
 	for name, account := range p.info.Accounts {
-		if strings.HasPrefix(name, "test") {
+		if strings.HasPrefix(name, "test") || name == "deployer" {
 			accounts = append(accounts, account.Addresses["kujira"])
 		}
 	}
