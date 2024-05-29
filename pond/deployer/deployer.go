@@ -125,7 +125,14 @@ func NewDeployer(
 		return deployer, err
 	}
 
-	deployer.registry = registry
+	deployer.registry = map[string]Code{}
+
+	for name, code := range registry {
+		deployer.registry[name] = Code{
+			Source:   code.Source,
+			Checksum: strings.ToUpper(code.Checksum),
+		}
+	}
 
 	return deployer, nil
 }
@@ -1212,16 +1219,7 @@ func (d *Deployer) Convert(data []byte) ([]byte, error) {
 		return nil, d.error(err)
 	}
 
-	regex := regexp.MustCompile(`^(.*)"(([^"])\s*\|\s*int\s*)"(.*)$`)
+	regex := regexp.MustCompile(`"((\d+)\s*\|\s*int\s*)"`)
 
-	parts := strings.Split(buffer.String(), ":")
-	for i, p := range parts {
-		matches := regex.FindStringSubmatch(p)
-		if len(matches) != 5 {
-			continue
-		}
-		parts[i] = matches[1] + matches[3] + matches[4]
-	}
-
-	return []byte(strings.Join(parts, ":")), nil
+	return []byte(regex.ReplaceAllString(string(data), "$2")), nil
 }
