@@ -968,6 +968,11 @@ func (d *Deployer) GetCode(code Code) ([]byte, error) {
 		return nil, d.error(err)
 	}
 
+	// if no checksum is defined, don't try to check it
+	if code.Checksum == "" {
+		return data, nil
+	}
+
 	checksum := utils.Sha256(data)
 	if !strings.EqualFold(checksum, code.Checksum) {
 		err = fmt.Errorf("checksum mismatch")
