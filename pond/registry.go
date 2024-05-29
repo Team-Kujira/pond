@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strings"
 
 	"pond/pond/deployer"
 	"pond/utils"
@@ -53,7 +54,13 @@ func (r *Registry) Load(filename string) error {
 		return r.error(err)
 	}
 
-	r.Data = items
+	r.Data = map[string]deployer.Code{}
+	for name, item := range items {
+		r.Data[name] = deployer.Code{
+			Source:   item.Source,
+			Checksum: strings.ToUpper(item.Checksum),
+		}
+	}
 
 	return nil
 }
@@ -107,7 +114,11 @@ func (r *Registry) List() error {
 
 	for _, key := range keys {
 		code := r.Data[key]
-		checksum := code.Checksum[:8] + "…" + code.Checksum[56:]
+		checksum := "................."
+		if len(code.Checksum) > 57 {
+			checksum = code.Checksum[:8] + "…" + code.Checksum[56:]
+		}
+
 		fmt.Printf("%s %-*s %s\n", checksum, padding, key, code.Source)
 	}
 
