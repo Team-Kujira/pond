@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 
@@ -1181,6 +1182,10 @@ func (d *Deployer) StringToFunds(str string) ([]Funds, error) {
 			Denom:  matches[2],
 		})
 	}
+
+	sort.Slice(funds, func(i, j int) bool {
+		return funds[i].Denom < funds[j].Denom
+	})
 
 	return funds, nil
 }
