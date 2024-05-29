@@ -104,6 +104,7 @@ func NewDeployer(
 		codes:     map[string]string{},
 		Denoms:    map[string]Denom{},
 		Contracts: map[string]Contract{},
+		CodeIds:   map[string]string{},
 		address:   "kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse",
 		addresses: map[string]struct{}{},
 		apiUrl:    apiUrl,
@@ -870,6 +871,8 @@ func (d *Deployer) SignAndSend(msgs []json.RawMessage) error {
 	if err != nil {
 		return err
 	}
+
+	d.logger.Trace().Msg(string(data))
 
 	unsigned, err := os.CreateTemp(d.node.Home, "tx")
 	if err != nil {
