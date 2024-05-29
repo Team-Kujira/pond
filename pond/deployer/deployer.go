@@ -895,7 +895,7 @@ func (d *Deployer) SignAndSend(msgs []json.RawMessage) error {
 	d.logger.Debug().Msg("sign tx")
 	output, err := d.node.Tx([]string{
 		"sign", "/home/kujira/.kujira/" + filepath.Base(unsigned.Name()),
-		"--from", "deployer",
+		"--from", "deployer", "--gas", "1000000000",
 	})
 	if err != nil {
 		return err
