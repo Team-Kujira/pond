@@ -14,7 +14,7 @@ import (
 )
 
 func (p *Pond) Init(
-	command, namespace, address, api, rpc string,
+	command, namespace, address, api, rpc, version string,
 	chains, plans []string,
 	nodes uint,
 	options map[string]string,
@@ -55,6 +55,10 @@ func (p *Pond) Init(
 		ApiUrl:  api,
 		RpcUrl:  rpc,
 		Address: address,
+	}
+
+	if version != "" {
+		p.config.Versions["kujira"] = version
 	}
 
 	types := map[string]int{
