@@ -18,6 +18,7 @@ import (
 	"sync"
 
 	"pond/pond/chain/node"
+	"pond/pond/registry"
 	"pond/utils"
 
 	"github.com/rs/zerolog"
@@ -34,7 +35,7 @@ type Deployer struct {
 	codes     map[string]string
 	plan      Plan
 	address   string
-	registry  map[string]Code
+	registry  *registry.Registry
 	apiUrl    string
 	home      string
 	accounts  []string // test accounts for minting assets
@@ -92,6 +93,7 @@ func NewDeployer(
 	node node.Node,
 	apiUrl string,
 	accounts []string,
+	registry *registry.Registry,
 ) (Deployer, error) {
 	logger.Debug().Msg("create deployer")
 
@@ -111,38 +113,10 @@ func NewDeployer(
 		apiUrl:    apiUrl,
 		home:      home,
 		accounts:  accounts,
-	}
-
-	err := deployer.LoadRegistry()
-	if err != nil {
-		return deployer, err
+		registry:  registry,
 	}
 
 	return deployer, nil
-}
-
-func (d *Deployer) LoadRegistry() error {
-	data, err := os.ReadFile(d.home + "/registry.json")
-	if err != nil {
-		return err
-	}
-
-	var registry map[string]Code
-	err = json.Unmarshal(data, &registry)
-	if err != nil {
-		return d.error(err)
-	}
-
-	d.registry = map[string]Code{}
-
-	for name, code := range registry {
-		d.registry[name] = Code{
-			Source:   code.Source,
-			Checksum: strings.ToUpper(code.Checksum),
-		}
-	}
-
-	return nil
 }
 
 func (d *Deployer) Deploy(filenames []string) error {
@@ -220,19 +194,21 @@ func (d *Deployer) DeployWasmFile(filename string) error {
 		return nil
 	}
 
+	err = d.registry.Set(filepath.Base(filename), registry.Code{
+		Checksum: utils.Sha256(data),
+		Source:   "file://" + filename,
+		Code:     data,
+	})
+	if err != nil {
+		return err
+	}
+
 	err = d.DeployCode(data)
 	if err != nil {
 		return err
 	}
 
-	// err = d.UpdateDeployedCodes()
-	// if err != nil {
-	// 	return err
-	// }
-
-	name := filepath.Base(filename)
-
-	return d.UpdateRegistry(name, "file://"+filename, data)
+	return nil
 }
 
 func (d *Deployer) DeployCode(data []byte) error {
@@ -515,7 +491,7 @@ func (d *Deployer) BuildAddress(hash, salt string) (string, error) {
 	return address, nil
 }
 
-func (d *Deployer) CreateCodeMsgs(codes []Code) ([]json.RawMessage, error) {
+func (d *Deployer) CreateCodeMsgs(codes []registry.Code) ([]json.RawMessage, error) {
 	d.logger.Debug().Msg("create code msgs")
 
 	msgs := make([]json.RawMessage, len(codes))
@@ -633,10 +609,8 @@ func (d *Deployer) CreateContractMsgs(
 	msgs := []json.RawMessage{}
 
 	for _, contract := range contracts {
-		code, found := d.registry[contract.Code]
-		if !found {
-			err := fmt.Errorf("code not found in registry")
-			d.logger.Err(err).Str("name", contract.Code).Msg("")
+		code, err := d.registry.Get(contract.Code)
+		if err != nil {
 			return nil, err
 		}
 
@@ -799,7 +773,7 @@ func (d *Deployer) UpdateDeployedCodes() error {
 			d.codes[code.DataHash] = code.CodeId
 		}
 
-		for name, code := range d.registry {
+		for name, code := range d.registry.Codes() {
 			codeId, found := d.codes[code.Checksum]
 			if !found {
 				continue
@@ -849,32 +823,6 @@ func (d *Deployer) UpdateDeployedContracts() error {
 		}
 
 		key = info.Pagination.NextKey
-	}
-
-	return nil
-}
-
-func (d *Deployer) UpdateRegistry(name, source string, code []byte) error {
-	_, found := d.registry[name]
-	if found {
-		d.logger.Debug().Str("name", name).Msg("code already registered")
-		return nil
-	}
-
-	d.registry[name] = Code{
-		Checksum: utils.Sha256(code),
-		Source:   source,
-		Code:     code,
-	}
-
-	data, err := json.Marshal(d.registry)
-	if err != nil {
-		return d.error(err)
-	}
-
-	err = os.WriteFile(d.home+"/registry.json", data, 0o644)
-	if err != nil {
-		return d.error(err)
 	}
 
 	return nil
@@ -951,7 +899,7 @@ func (d *Deployer) SignAndSend(msgs []json.RawMessage) error {
 	return nil
 }
 
-func (d *Deployer) GetCode(code Code) ([]byte, error) {
+func (d *Deployer) GetCode(code registry.Code) ([]byte, error) {
 	parts, err := url.Parse(code.Source)
 	if err != nil {
 		return nil, d.error(err)
@@ -1004,20 +952,18 @@ func (d *Deployer) GetCode(code Code) ([]byte, error) {
 	return data, nil
 }
 
-func (d *Deployer) GetMissingCodes() ([]Code, error) {
+func (d *Deployer) GetMissingCodes() ([]registry.Code, error) {
 	d.logger.Debug().Msg("get missing codes")
-	missing := map[string]Code{}
+	missing := map[string]registry.Code{}
 
 	for _, contracts := range d.plan.Contracts {
 		for _, contract := range contracts {
-			code, found := d.registry[contract.Code]
-			if !found {
-				err := fmt.Errorf("code not found in registry")
-				d.logger.Err(err).Str("code", contract.Code)
+			code, err := d.registry.Get(contract.Code)
+			if err != nil {
 				return nil, err
 			}
 
-			_, found = d.codes[code.Checksum]
+			_, found := d.codes[code.Checksum]
 			if found {
 				// already deployed
 				continue
@@ -1034,11 +980,11 @@ func (d *Deployer) GetMissingCodes() ([]Code, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	codes := []Code{}
+	codes := []registry.Code{}
 
 	for _, code := range missing {
 		wg.Add(1)
-		go func(code Code) {
+		go func(code registry.Code) {
 			defer wg.Done()
 
 			select {
@@ -1120,16 +1066,11 @@ func (d *Deployer) GetDenomsFromCreator(address string) ([]string, error) {
 	return response.Denoms, nil
 }
 
-func (d *Deployer) GetDeployedCodes() ([]Code, error) {
-	codes := []Code{}
+func (d *Deployer) GetDeployedCodes() ([]registry.Code, error) {
+	codes := []registry.Code{}
 	names := map[string]string{}
 
-	err := d.LoadRegistry()
-	if err != nil {
-		return nil, err
-	}
-
-	for name, code := range d.registry {
+	for name, code := range d.registry.Codes() {
 		fmt.Println(name)
 		names[code.Checksum] = name
 	}
@@ -1143,7 +1084,7 @@ func (d *Deployer) GetDeployedCodes() ([]Code, error) {
 				Msg("code not registered")
 		}
 
-		codes = append(codes, Code{
+		codes = append(codes, registry.Code{
 			Checksum: checksum,
 			Name:     name,
 			Id:       id,
@@ -1157,10 +1098,8 @@ func (d *Deployer) GetDeployedContracts() ([]Contract, error) {
 	contracts := []Contract{}
 
 	for _, contract := range d.Contracts {
-		code, found := d.registry[contract.Code]
-		if !found {
-			err := fmt.Errorf("contract not registered")
-			d.logger.Err(err).Str("name", contract.Code).Msg("")
+		code, err := d.registry.Get(contract.Code)
+		if err != nil {
 			return nil, err
 		}
 

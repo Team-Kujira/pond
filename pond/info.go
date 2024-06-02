@@ -7,7 +7,7 @@ import (
 	"sort"
 
 	"pond/pond/chain/node"
-	"pond/pond/deployer"
+	"pond/pond/registry"
 )
 
 type Account struct {
@@ -24,7 +24,7 @@ type Contract struct {
 type Info struct {
 	Validators map[string][]node.Node `json:"validators"`
 	Accounts   map[string]Account     `json:"accounts"`
-	Codes      []deployer.Code        `json:"codes"`
+	Codes      []registry.Code        `json:"codes"`
 	Contracts  []Contract             `json:"contracts"`
 }
 
