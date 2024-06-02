@@ -1071,7 +1071,6 @@ func (d *Deployer) GetDeployedCodes() ([]registry.Code, error) {
 	names := map[string]string{}
 
 	for name, code := range d.registry.Codes() {
-		fmt.Println(name)
 		names[code.Checksum] = name
 	}
 
