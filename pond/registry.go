@@ -177,7 +177,12 @@ func (p *Pond) ListRegistry() error {
 }
 
 func (p *Pond) UpdateRegistry(name string, args map[string]string) error {
-	return p.registry.Update(name, args)
+	err := p.registry.Update(name, args)
+	if err != nil {
+		return err
+	}
+
+	return p.UpdateCodes()
 }
 
 func (p *Pond) ExportRegistry(filename string) error {
@@ -185,5 +190,10 @@ func (p *Pond) ExportRegistry(filename string) error {
 }
 
 func (p *Pond) ImportRegistry(filename string) error {
-	return p.registry.Import(filename)
+	err := p.registry.Import(filename)
+	if err != nil {
+		return err
+	}
+
+	return p.UpdateCodes()
 }

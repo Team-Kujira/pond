@@ -113,28 +113,36 @@ func NewDeployer(
 		accounts:  accounts,
 	}
 
-	data, err := os.ReadFile(home + "/registry.json")
+	err := deployer.LoadRegistry()
 	if err != nil {
 		return deployer, err
+	}
+
+	return deployer, nil
+}
+
+func (d *Deployer) LoadRegistry() error {
+	data, err := os.ReadFile(d.home + "/registry.json")
+	if err != nil {
+		return err
 	}
 
 	var registry map[string]Code
 	err = json.Unmarshal(data, &registry)
 	if err != nil {
-		logger.Err(err)
-		return deployer, err
+		return d.error(err)
 	}
 
-	deployer.registry = map[string]Code{}
+	d.registry = map[string]Code{}
 
 	for name, code := range registry {
-		deployer.registry[name] = Code{
+		d.registry[name] = Code{
 			Source:   code.Source,
 			Checksum: strings.ToUpper(code.Checksum),
 		}
 	}
 
-	return deployer, nil
+	return nil
 }
 
 func (d *Deployer) Deploy(filenames []string) error {
@@ -217,10 +225,10 @@ func (d *Deployer) DeployWasmFile(filename string) error {
 		return err
 	}
 
-	err = d.UpdateDeployedCodes()
-	if err != nil {
-		return err
-	}
+	// err = d.UpdateDeployedCodes()
+	// if err != nil {
+	// 	return err
+	// }
 
 	name := filepath.Base(filename)
 
@@ -1116,7 +1124,13 @@ func (d *Deployer) GetDeployedCodes() ([]Code, error) {
 	codes := []Code{}
 	names := map[string]string{}
 
+	err := d.LoadRegistry()
+	if err != nil {
+		return nil, err
+	}
+
 	for name, code := range d.registry {
+		fmt.Println(name)
 		names[code.Checksum] = name
 	}
 
