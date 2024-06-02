@@ -161,6 +161,9 @@ func (i *Info) ListCodes() error {
 	fmt.Printf("%*s checksum          name\n", padding, "id")
 
 	for _, code := range i.Codes {
+		if code.Name == "" {
+			continue
+		}
 		checksum := code.Checksum[:8] + "…" + code.Checksum[56:]
 
 		lines = append(lines, fmt.Sprintf(
