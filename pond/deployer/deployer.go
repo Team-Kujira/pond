@@ -42,9 +42,10 @@ type Deployer struct {
 }
 
 type Plan struct {
-	Denoms    []Denom      `yaml:"denoms"`
-	Contracts [][]Contract `yaml:"contracts"`
-	Names     []string     // holds plan file names, used only for logging
+	Denoms    []Denom           `yaml:"denoms"`
+	Codes     map[string]string `yaml:"codes"`
+	Contracts [][]Contract      `yaml:"contracts"`
+	Names     []string          // holds plan file names, used only for logging
 }
 
 type CodeMsg struct {
@@ -103,6 +104,7 @@ func NewDeployer(
 		plan: Plan{
 			Denoms:    []Denom{},
 			Contracts: [][]Contract{},
+			Codes:     map[string]string{},
 		},
 		codes:     map[string]string{},
 		Denoms:    map[string]Denom{},
@@ -194,7 +196,9 @@ func (d *Deployer) DeployWasmFile(filename string) error {
 		return nil
 	}
 
-	err = d.registry.Set(filepath.Base(filename), registry.Code{
+	name := strings.Replace(filepath.Base(filename), ".", "_", -1)
+
+	err = d.registry.Set(name, registry.Code{
 		Checksum: utils.Sha256(data),
 		Source:   "file://" + filename,
 		Code:     data,
@@ -453,6 +457,14 @@ func (d *Deployer) LoadPlan(data []byte, name string) error {
 		}
 
 		d.plan.Denoms = append(d.plan.Denoms, denom)
+	}
+
+	// loop is needed to override already set
+	for code, source := range plan.Codes {
+		if !strings.HasPrefix(source, "file://") {
+			continue
+		}
+		d.plan.Codes[code] = source
 	}
 
 	d.plan.Contracts = append(d.plan.Contracts, plan.Contracts...)
@@ -955,6 +967,24 @@ func (d *Deployer) GetCode(code registry.Code) ([]byte, error) {
 func (d *Deployer) GetMissingCodes() ([]registry.Code, error) {
 	d.logger.Debug().Msg("get missing codes")
 	missing := map[string]registry.Code{}
+
+	// update registry first
+	for name, source := range d.plan.Codes {
+		code, err := d.registry.Get(name)
+		if err != nil {
+			code = registry.Code{}
+		}
+
+		data, err := os.ReadFile(strings.Replace(source, "file://", "", -1))
+		if err != nil {
+			return nil, err
+		}
+
+		code.Checksum = utils.Sha256(data)
+		code.Source = source
+
+		d.registry.Set(name, code)
+	}
 
 	for _, contracts := range d.plan.Contracts {
 		for _, contract := range contracts {
