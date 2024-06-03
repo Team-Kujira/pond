@@ -969,9 +969,10 @@ func (d *Deployer) GetMissingCodes() ([]registry.Code, error) {
 	missing := map[string]registry.Code{}
 
 	// update registry first
+	// using registry.Codes() to not cause error message at this point
 	for name, source := range d.plan.Codes {
-		code, err := d.registry.Get(name)
-		if err != nil {
+		code, found := d.registry.Codes()[name]
+		if !found {
 			code = registry.Code{}
 		}
 

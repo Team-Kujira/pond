@@ -182,11 +182,11 @@ func (r *Registry) Update(name string, args map[string]string) error {
 func (r *Registry) Get(name string) (Code, error) {
 	code, found := r.Data[name]
 	if !found {
-		err := fmt.Errorf("code not found")
-		r.logger.Err(err).
+		msg := "code not found"
+		r.logger.Error().
 			Str("name", name).
-			Msg("")
-		return Code{}, err
+			Msg(msg)
+		return Code{}, fmt.Errorf(msg)
 	}
 	return code, nil
 }
