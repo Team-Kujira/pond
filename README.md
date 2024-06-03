@@ -288,7 +288,8 @@ Default plan files shipped with pond can be found in `$HOME/.pond/planfiles`.
 ```json
 {
   "denom": "{{ .Denoms.USDC.Path }}",
-  "address": "{{ .Contracts.my_contract.Address }}"
+  "address": "{{ .Contracts.my_contract.Address }}",
+  "code_id": "{{ .CodeIds.my_contract | int }}"
 }
 ```
 
@@ -327,6 +328,17 @@ Example:
 The above example will create the `POND` token as `factory/kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse/upond` and mint 10 `POND` (10m upond) into each test wallet. `KUJI` and `USDC` have a path provided and therefore will be skipped.
 
 It stores the path of all three denoms, which can be accessed in subsequent contract instantiations of that deployment via `{{ .Denoms.POND.Address }}` for example.
+
+#### Codes
+
+If you are working on contracts that change a lot during the development, updating the registry all the might become a tedious task. Therefore you can specify your sources directly in the plan file and Pond deploys them and updates the registry accordingly.
+
+```json
+{
+  "codes":
+    "my_project": "file:///path/to/my_project/artifacts/my_project-aarch64.wasm"
+}
+```
 
 #### Contracts
 
