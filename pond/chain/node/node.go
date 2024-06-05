@@ -143,6 +143,19 @@ func (n *Node) Init(namespace string, amount int) error {
 		return err
 	}
 
+	retries := 10
+	for i := 0; i < retries; i++ {
+		_, err = os.Stat(fmt.Sprintf("%s/config/genesis.json", n.Home))
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Millisecond * 200)
+	}
+
+	if err != nil {
+		return err
+	}
+
 	err = n.AddKey("validator", n.Mnemonic)
 	if err != nil {
 		n.logger.Err(err)

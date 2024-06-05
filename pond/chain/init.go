@@ -61,6 +61,8 @@ func (c *Chain) Init(namespace string, options map[string]string) error {
 				return
 			}
 
+			c.WaitForNode(c.Nodes[i].Moniker)
+
 			err = c.Nodes[i].Init(namespace, amount)
 			if err != nil {
 				wg.Done()
