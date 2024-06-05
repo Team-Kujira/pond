@@ -148,7 +148,7 @@ func (n *Node) Init(namespace string, amount int) error {
 		if err == nil {
 			break
 		}
-		n.logger.Info().Msg("wait genesis.json")
+		n.logger.Debug().Msg("wait genesis.json")
 		time.Sleep(time.Millisecond * 200)
 	}
 	if err != nil {
@@ -173,6 +173,10 @@ func (n *Node) Init(namespace string, amount int) error {
 		return err
 	}
 
+	// updating the genesis file takes a little bit, so sleep 100ms
+	// to ensure the address is found and prevent sleeping once for 500ms
+	time.Sleep(time.Millisecond * 100)
+
 	for i := 0; i < 5; i++ {
 		data, err := os.ReadFile(fmt.Sprintf("%s/config/genesis.json", n.Home))
 		if err != nil {
@@ -183,7 +187,7 @@ func (n *Node) Init(namespace string, amount int) error {
 			break
 		}
 
-		n.logger.Info().Msg("wait for genesis account")
+		n.logger.Debug().Msg("wait for genesis account")
 		time.Sleep(time.Millisecond * 500)
 	}
 
