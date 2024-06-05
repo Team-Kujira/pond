@@ -143,15 +143,14 @@ func (n *Node) Init(namespace string, amount int) error {
 		return err
 	}
 
-	retries := 10
-	for i := 0; i < retries; i++ {
+	for i := 0; i < 10; i++ {
 		_, err = os.Stat(fmt.Sprintf("%s/config/genesis.json", n.Home))
 		if err == nil {
 			break
 		}
+		n.logger.Info().Msg("wait genesis.json")
 		time.Sleep(time.Millisecond * 200)
 	}
-
 	if err != nil {
 		return err
 	}
@@ -172,6 +171,20 @@ func (n *Node) Init(namespace string, amount int) error {
 	err = n.AddGenesisAccount(n.Address, amount)
 	if err != nil {
 		return err
+	}
+
+	for i := 0; i < 5; i++ {
+		data, err := os.ReadFile(fmt.Sprintf("%s/config/genesis.json", n.Home))
+		if err != nil {
+			return err
+		}
+
+		if strings.Contains(string(data), address) {
+			break
+		}
+
+		n.logger.Info().Msg("wait for genesis account")
+		time.Sleep(time.Millisecond * 500)
 	}
 
 	err = n.CreateGentx(amount / 2)
