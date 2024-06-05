@@ -288,9 +288,12 @@ Default plan files shipped with pond can be found in `$HOME/.pond/planfiles`.
 ```json
 {
   "denom": "{{ .Denoms.USDC.Path }}",
-  "address": "{{ .Contracts.my_contract.Address }}"
+  "address": "{{ .Contracts.my_contract.Address }}",
+  "code_id": "{{ .CodeIds.my_contract }} | int"
 }
 ```
+
+Note: To be able to use the resulting code id as an integer value, you need to add `| int` after the template string. Otherwise the code id is provided as a string.
 
 All deployments are done from the `deployer` account: `kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse`
 
@@ -328,9 +331,20 @@ The above example will create the `POND` token as `factory/kujira1k3g54c2sc7g9mg
 
 It stores the path of all three denoms, which can be accessed in subsequent contract instantiations of that deployment via `{{ .Denoms.POND.Address }}` for example.
 
+#### Codes
+
+If you are working on contracts that change a lot during the development, updating the registry all the might become a tedious task. Therefore you can specify your sources directly in the plan file and Pond deploys them and updates the registry accordingly.
+
+```json
+{
+  "codes":
+    "my_project": "file:///path/to/my_project/artifacts/my_project-aarch64.wasm"
+}
+```
+
 #### Contracts
 
-Pond instantiates all contracts from the `deployer` account, which also is set as the owner by default.
+Pond instantiates all contracts from the `deployer` account.
 
 To speed up the deployments, Pond handles contracts in batches which combine all instantiations into a single transaction:
 

@@ -21,6 +21,7 @@ var (
 	NoContracts   bool
 	ApiUrl        string
 	RpcUrl        string
+	KujiraVersion string
 )
 
 // initCmd represents the init command
@@ -63,7 +64,7 @@ var initCmd = &cobra.Command{
 
 		pond, _ := pond.NewPond(LogLevel)
 		pond.Init(
-			"docker", Namespace, ListenAddress, ApiUrl, RpcUrl,
+			"docker", Namespace, ListenAddress, ApiUrl, RpcUrl, KujiraVersion,
 			Chains, Contracts, Nodes, options,
 		)
 	},
@@ -78,6 +79,7 @@ func init() {
 	initCmd.PersistentFlags().StringVar(&ListenAddress, "listen", "127.0.0.1", "Set listen address")
 	initCmd.PersistentFlags().StringVar(&ApiUrl, "api-url", "https://rest.cosmos.directory/kujira", "Set API URL")
 	initCmd.PersistentFlags().StringVar(&RpcUrl, "rpc-url", "https://rpc.cosmos.directory/kujira", "Set RPC URL")
+	initCmd.PersistentFlags().StringVar(&KujiraVersion, "kujira-version", "", "Set Kujira version")
 	initCmd.PersistentFlags().BoolVar(&NoContracts, "no-contracts", false, "Don't deploy contracts on first start")
 
 	chains, err := templates.GetChains()

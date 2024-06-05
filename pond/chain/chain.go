@@ -6,11 +6,13 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"pond/pond/chain/feeder"
 	"pond/pond/chain/node"
+	"pond/pond/globals"
 	"pond/utils"
 
 	"github.com/rs/zerolog"
@@ -158,7 +160,9 @@ func (c *Chain) UpdateGenesis(overrides map[string]string) error {
 			"app_state/gov/params/voting_period":      "120s",
 		},
 		"kujira": {
-			"app_state/mint/minter/inflation":                     "0.0",
+			"app_state/mint/minter/inflation": "0.0",
+		},
+		"kujira-99f7924-1": {
 			"app_state/oracle/params/required_denoms":             []string{"BTC", "ETH"},
 			"consensus/params/abci/vote_extensions_enable_height": "1",
 		},
@@ -179,7 +183,12 @@ func (c *Chain) UpdateGenesis(overrides map[string]string) error {
 		return c.error(err)
 	}
 
-	for _, key := range []string{"_default", node.Type} {
+	version, found := globals.Versions[node.Type]
+	if !found {
+		return fmt.Errorf("version not found")
+	}
+	keys := []string{"_default", node.Type, node.Type + "-" + version}
+	for _, key := range keys {
 		values, found := config[key]
 		if !found {
 			continue
@@ -217,6 +226,9 @@ func (c *Chain) GetHeight() (int64, error) {
 		SyncInfo struct {
 			LatestBlockHeight string `json:"latest_block_height"`
 		} `json:"sync_info"`
+		SyncInfoOld struct {
+			LatestBlockHeight string `json:"latest_block_height"`
+		} `json:"SyncInfo"`
 	}
 
 	var status Status
@@ -231,7 +243,12 @@ func (c *Chain) GetHeight() (int64, error) {
 		return -1, c.error(err)
 	}
 
-	height, err := strconv.ParseInt(status.SyncInfo.LatestBlockHeight, 10, 64)
+	strHeight := status.SyncInfoOld.LatestBlockHeight
+	if strHeight == "" {
+		strHeight = status.SyncInfo.LatestBlockHeight
+	}
+
+	height, err := strconv.ParseInt(strHeight, 10, 64)
 	if err != nil {
 		return -1, c.error(err)
 	}
@@ -360,6 +377,40 @@ func (c *Chain) SubmitProposal(data []byte, option string) error {
 	}
 
 	wg.Wait()
+
+	return nil
+}
+
+func (c *Chain) WaitForNode(name string) error {
+	c.logger.Debug().Str("node", name).Msg("wait for node")
+
+	command := []string{c.Command, "ps", "-qf", "name=" + name}
+	c.logger.Debug().Msg(strings.Join(command, " "))
+
+	var (
+		output []byte
+		err    error
+	)
+
+	retries := 10
+	for i := 0; i < retries; i++ {
+		output, err = utils.RunO(c.logger, command)
+		if err != nil {
+			return err
+		}
+
+		if len(output) > 0 {
+			break
+		}
+
+		time.Sleep(time.Millisecond * 200)
+	}
+
+	if len(output) == 0 {
+		msg := "node not running"
+		c.logger.Error().Str("node", name).Msg(msg)
+		return fmt.Errorf(msg)
+	}
 
 	return nil
 }

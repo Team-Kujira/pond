@@ -13,10 +13,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 
 	"pond/pond/chain/node"
+	"pond/pond/registry"
 	"pond/utils"
 
 	"github.com/rs/zerolog"
@@ -28,20 +30,22 @@ type Deployer struct {
 	node      node.Node
 	Denoms    map[string]Denom
 	Contracts map[string]Contract
+	CodeIds   map[string]string
 	addresses map[string]struct{}
 	codes     map[string]string
 	plan      Plan
 	address   string
-	registry  map[string]Code
+	registry  *registry.Registry
 	apiUrl    string
 	home      string
 	accounts  []string // test accounts for minting assets
 }
 
 type Plan struct {
-	Denoms    []Denom      `yaml:"denoms"`
-	Contracts [][]Contract `yaml:"contracts"`
-	Names     []string     // holds plan file names, used only for logging
+	Denoms    []Denom           `yaml:"denoms"`
+	Codes     map[string]string `yaml:"codes"`
+	Contracts [][]Contract      `yaml:"contracts"`
+	Names     []string          // holds plan file names, used only for logging
 }
 
 type CodeMsg struct {
@@ -90,6 +94,7 @@ func NewDeployer(
 	node node.Node,
 	apiUrl string,
 	accounts []string,
+	registry *registry.Registry,
 ) (Deployer, error) {
 	logger.Debug().Msg("create deployer")
 
@@ -99,30 +104,19 @@ func NewDeployer(
 		plan: Plan{
 			Denoms:    []Denom{},
 			Contracts: [][]Contract{},
+			Codes:     map[string]string{},
 		},
 		codes:     map[string]string{},
 		Denoms:    map[string]Denom{},
 		Contracts: map[string]Contract{},
+		CodeIds:   map[string]string{},
 		address:   "kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse",
 		addresses: map[string]struct{}{},
 		apiUrl:    apiUrl,
 		home:      home,
 		accounts:  accounts,
+		registry:  registry,
 	}
-
-	data, err := os.ReadFile(home + "/registry.json")
-	if err != nil {
-		return deployer, err
-	}
-
-	var registry map[string]Code
-	err = json.Unmarshal(data, &registry)
-	if err != nil {
-		logger.Err(err)
-		return deployer, err
-	}
-
-	deployer.registry = registry
 
 	return deployer, nil
 }
@@ -160,7 +154,7 @@ func (d *Deployer) Deploy(filenames []string) error {
 		contentType := http.DetectContentType(buf)
 
 		switch contentType {
-		case "text/plain; charset=utf-8":
+		case "text/plain; charset=utf-8", "application/octet-stream":
 			// return d.DeployPlanfiles([]string{filename})
 			err := d.LoadPlanFile(filename)
 			if err != nil {
@@ -202,19 +196,23 @@ func (d *Deployer) DeployWasmFile(filename string) error {
 		return nil
 	}
 
+	name := strings.Replace(filepath.Base(filename), ".", "_", -1)
+
+	err = d.registry.Set(name, registry.Code{
+		Checksum: utils.Sha256(data),
+		Source:   "file://" + filename,
+		Code:     data,
+	})
+	if err != nil {
+		return err
+	}
+
 	err = d.DeployCode(data)
 	if err != nil {
 		return err
 	}
 
-	err = d.UpdateDeployedCodes()
-	if err != nil {
-		return err
-	}
-
-	name := filepath.Base(filename)
-
-	return d.UpdateRegistry(name, "file://"+filename, data)
+	return nil
 }
 
 func (d *Deployer) DeployCode(data []byte) error {
@@ -461,6 +459,14 @@ func (d *Deployer) LoadPlan(data []byte, name string) error {
 		d.plan.Denoms = append(d.plan.Denoms, denom)
 	}
 
+	// loop is needed to override already set
+	for code, source := range plan.Codes {
+		if !strings.HasPrefix(source, "file://") {
+			continue
+		}
+		d.plan.Codes[code] = source
+	}
+
 	d.plan.Contracts = append(d.plan.Contracts, plan.Contracts...)
 
 	names := make([]string, len(d.plan.Contracts))
@@ -497,7 +503,7 @@ func (d *Deployer) BuildAddress(hash, salt string) (string, error) {
 	return address, nil
 }
 
-func (d *Deployer) CreateCodeMsgs(codes []Code) ([]json.RawMessage, error) {
+func (d *Deployer) CreateCodeMsgs(codes []registry.Code) ([]json.RawMessage, error) {
 	d.logger.Debug().Msg("create code msgs")
 
 	msgs := make([]json.RawMessage, len(codes))
@@ -615,10 +621,8 @@ func (d *Deployer) CreateContractMsgs(
 	msgs := []json.RawMessage{}
 
 	for _, contract := range contracts {
-		code, found := d.registry[contract.Code]
-		if !found {
-			err := fmt.Errorf("code not found in registry")
-			d.logger.Err(err).Str("name", contract.Code).Msg("")
+		code, err := d.registry.Get(contract.Code)
+		if err != nil {
 			return nil, err
 		}
 
@@ -627,11 +631,6 @@ func (d *Deployer) CreateContractMsgs(
 			err := fmt.Errorf("code not yet deployed")
 			d.logger.Err(err).Str("checksum", code.Checksum).Msg("")
 			return nil, err
-		}
-
-		_, found = contract.Msg["owner"]
-		if !found {
-			contract.Msg["owner"] = []byte(`"` + d.address + `"`)
 		}
 
 		hash := sha256.New()
@@ -674,7 +673,10 @@ func (d *Deployer) CreateContractMsgs(
 			return nil, d.error(err)
 		}
 
-		msg := buffer.Bytes()
+		msg, err := d.Convert(buffer.Bytes())
+		if err != nil {
+			return nil, err
+		}
 
 		funds, err := d.StringToFunds(contract.Funds)
 		if err != nil {
@@ -778,6 +780,14 @@ func (d *Deployer) UpdateDeployedCodes() error {
 			d.codes[code.DataHash] = code.CodeId
 		}
 
+		for name, code := range d.registry.Codes() {
+			codeId, found := d.codes[code.Checksum]
+			if !found {
+				continue
+			}
+			d.CodeIds[name] = codeId
+		}
+
 		key = info.Pagination.NextKey
 	}
 
@@ -825,32 +835,6 @@ func (d *Deployer) UpdateDeployedContracts() error {
 	return nil
 }
 
-func (d *Deployer) UpdateRegistry(name, source string, code []byte) error {
-	_, found := d.registry[name]
-	if found {
-		d.logger.Debug().Str("name", name).Msg("code already registered")
-		return nil
-	}
-
-	d.registry[name] = Code{
-		Checksum: utils.Sha256(code),
-		Source:   source,
-		Code:     code,
-	}
-
-	data, err := json.Marshal(d.registry)
-	if err != nil {
-		return d.error(err)
-	}
-
-	err = os.WriteFile(d.home+"/registry.json", data, 0o644)
-	if err != nil {
-		return d.error(err)
-	}
-
-	return nil
-}
-
 func (d *Deployer) SignAndSend(msgs []json.RawMessage) error {
 	data, err := json.Marshal(msgs)
 	if err != nil {
@@ -861,6 +845,8 @@ func (d *Deployer) SignAndSend(msgs []json.RawMessage) error {
 	if err != nil {
 		return err
 	}
+
+	d.logger.Trace().Msg(string(data))
 
 	unsigned, err := os.CreateTemp(d.node.Home, "tx")
 	if err != nil {
@@ -879,7 +865,7 @@ func (d *Deployer) SignAndSend(msgs []json.RawMessage) error {
 	d.logger.Debug().Msg("sign tx")
 	output, err := d.node.Tx([]string{
 		"sign", "/home/kujira/.kujira/" + filepath.Base(unsigned.Name()),
-		"--from", "deployer",
+		"--from", "deployer", "--gas", "1000000000",
 	})
 	if err != nil {
 		return err
@@ -920,7 +906,7 @@ func (d *Deployer) SignAndSend(msgs []json.RawMessage) error {
 	return nil
 }
 
-func (d *Deployer) GetCode(code Code) ([]byte, error) {
+func (d *Deployer) GetCode(code registry.Code) ([]byte, error) {
 	parts, err := url.Parse(code.Source)
 	if err != nil {
 		return nil, d.error(err)
@@ -955,6 +941,11 @@ func (d *Deployer) GetCode(code Code) ([]byte, error) {
 		return nil, d.error(err)
 	}
 
+	// if no checksum is defined, don't try to check it
+	if code.Checksum == "" {
+		return data, nil
+	}
+
 	checksum := utils.Sha256(data)
 	if !strings.EqualFold(checksum, code.Checksum) {
 		err = fmt.Errorf("checksum mismatch")
@@ -968,20 +959,37 @@ func (d *Deployer) GetCode(code Code) ([]byte, error) {
 	return data, nil
 }
 
-func (d *Deployer) GetMissingCodes() ([]Code, error) {
+func (d *Deployer) GetMissingCodes() ([]registry.Code, error) {
 	d.logger.Debug().Msg("get missing codes")
-	missing := map[string]Code{}
+	missing := map[string]registry.Code{}
+
+	// update registry first
+	// using registry.Codes() to not cause error message at this point
+	for name, source := range d.plan.Codes {
+		code, found := d.registry.Codes()[name]
+		if !found {
+			code = registry.Code{}
+		}
+
+		data, err := os.ReadFile(strings.Replace(source, "file://", "", -1))
+		if err != nil {
+			return nil, err
+		}
+
+		code.Checksum = utils.Sha256(data)
+		code.Source = source
+
+		d.registry.Set(name, code)
+	}
 
 	for _, contracts := range d.plan.Contracts {
 		for _, contract := range contracts {
-			code, found := d.registry[contract.Code]
-			if !found {
-				err := fmt.Errorf("code not found in registry")
-				d.logger.Err(err).Str("code", contract.Code)
+			code, err := d.registry.Get(contract.Code)
+			if err != nil {
 				return nil, err
 			}
 
-			_, found = d.codes[code.Checksum]
+			_, found := d.codes[code.Checksum]
 			if found {
 				// already deployed
 				continue
@@ -998,11 +1006,11 @@ func (d *Deployer) GetMissingCodes() ([]Code, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	codes := []Code{}
+	codes := []registry.Code{}
 
 	for _, code := range missing {
 		wg.Add(1)
-		go func(code Code) {
+		go func(code registry.Code) {
 			defer wg.Done()
 
 			select {
@@ -1084,11 +1092,11 @@ func (d *Deployer) GetDenomsFromCreator(address string) ([]string, error) {
 	return response.Denoms, nil
 }
 
-func (d *Deployer) GetDeployedCodes() ([]Code, error) {
-	codes := []Code{}
+func (d *Deployer) GetDeployedCodes() ([]registry.Code, error) {
+	codes := []registry.Code{}
 	names := map[string]string{}
 
-	for name, code := range d.registry {
+	for name, code := range d.registry.Codes() {
 		names[code.Checksum] = name
 	}
 
@@ -1101,7 +1109,7 @@ func (d *Deployer) GetDeployedCodes() ([]Code, error) {
 				Msg("code not registered")
 		}
 
-		codes = append(codes, Code{
+		codes = append(codes, registry.Code{
 			Checksum: checksum,
 			Name:     name,
 			Id:       id,
@@ -1115,10 +1123,8 @@ func (d *Deployer) GetDeployedContracts() ([]Contract, error) {
 	contracts := []Contract{}
 
 	for _, contract := range d.Contracts {
-		code, found := d.registry[contract.Code]
-		if !found {
-			err := fmt.Errorf("contract not registered")
-			d.logger.Err(err).Str("name", contract.Code).Msg("")
+		code, err := d.registry.Get(contract.Code)
+		if err != nil {
 			return nil, err
 		}
 
@@ -1143,7 +1149,21 @@ func (d *Deployer) StringToFunds(str string) ([]Funds, error) {
 		return funds, nil
 	}
 
-	regex := regexp.MustCompile(`^(\d+)([/A-Za-z0-1]+)$`)
+	tmpl, err := template.New("").Parse(str)
+	if err != nil {
+		return nil, d.error(err)
+	}
+
+	var buffer bytes.Buffer
+
+	err = tmpl.Execute(&buffer, d)
+	if err != nil {
+		return nil, d.error(err)
+	}
+
+	str = buffer.String()
+
+	regex := regexp.MustCompile(`^(\d+)([/A-Za-z0-9]+)$`)
 
 	for _, part := range strings.Split(str, ",") {
 		matches := regex.FindStringSubmatch(part)
@@ -1156,5 +1176,28 @@ func (d *Deployer) StringToFunds(str string) ([]Funds, error) {
 		})
 	}
 
+	sort.Slice(funds, func(i, j int) bool {
+		return funds[i].Denom < funds[j].Denom
+	})
+
 	return funds, nil
+}
+
+func (d *Deployer) Convert(data []byte) ([]byte, error) {
+	raw := json.RawMessage(data)
+
+	data, err := json.Marshal(raw)
+	if err != nil {
+		return nil, d.error(err)
+	}
+
+	buffer := new(bytes.Buffer)
+	err = json.Compact(buffer, data)
+	if err != nil {
+		return nil, d.error(err)
+	}
+
+	regex := regexp.MustCompile(`"((\d+)\s*\|\s*int\s*)"`)
+
+	return []byte(regex.ReplaceAllString(string(data), "$2")), nil
 }

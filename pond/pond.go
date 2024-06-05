@@ -11,6 +11,7 @@ import (
 	"pond/pond/chain"
 	"pond/pond/chain/node"
 	"pond/pond/deployer"
+	"pond/pond/registry"
 	"pond/pond/relayer"
 	"pond/pond/templates"
 	"pond/utils"
@@ -27,7 +28,7 @@ type Pond struct {
 	relayer  relayer.Relayer
 	deployer deployer.Deployer
 	proxy    Proxy
-	registry Registry
+	registry *registry.Registry
 }
 
 func NewPond(logLevel string) (Pond, error) {
@@ -108,26 +109,26 @@ func (p *Pond) init() error {
 		return nil
 	}
 
+	p.registry, err = registry.NewRegistry(p.logger, p.home+"/registry.json")
+	if err != nil {
+		return err
+	}
+
 	accounts := []string{}
 	for name, account := range p.info.Accounts {
-		if strings.HasPrefix(name, "test") {
+		if strings.HasPrefix(name, "test") || name == "deployer" {
 			accounts = append(accounts, account.Addresses["kujira"])
 		}
 	}
 
 	p.deployer, err = deployer.NewDeployer(
-		p.logger, p.home, nodes[0], p.config.ApiUrl, accounts,
+		p.logger, p.home, nodes[0], p.config.ApiUrl, accounts, p.registry,
 	)
 	if err != nil {
 		return p.error(err)
 	}
 
 	p.proxy, err = NewProxy(p.logger, p.config.Command, p.config.Address)
-	if err != nil {
-		return err
-	}
-
-	p.registry, err = NewRegistry(p.logger, p.home+"/registry.json")
 	if err != nil {
 		return err
 	}

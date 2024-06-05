@@ -29,7 +29,7 @@ func (c *Chain) Init(namespace string, options map[string]string) error {
 
 	image := fmt.Sprintf("docker.io/%s/%s:%s", namespace, c.Type, version)
 
-	amount := 1_000_000_000_000
+	amount := 10_000_000_000_000
 
 	var wg sync.WaitGroup
 
@@ -60,6 +60,8 @@ func (c *Chain) Init(namespace string, options map[string]string) error {
 				wg.Done()
 				return
 			}
+
+			c.WaitForNode(c.Nodes[i].Moniker)
 
 			err = c.Nodes[i].Init(namespace, amount)
 			if err != nil {

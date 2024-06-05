@@ -28,6 +28,7 @@
         "label": "USK Controller",
         "funds": "10000000ukuji",
         "msg": {
+          "owner": "kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse",
           "denom": "uusk"
         },
         "creates": [
@@ -45,6 +46,7 @@
         "label": "Ghost Vault USK",
         "funds": "20000000ukuji",
         "msg": {
+          "owner": "kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse",
           "denom": "{{ .Denoms.USK.Path }}",
           "oracle": {
             "static": "1"
@@ -100,6 +102,7 @@
         "code": "kujira_fin",
         "label": "Fin KUJI-USK",
         "msg": {
+          "owner": "kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse",
           "denoms": [
             {
               "native": "{{ .Denoms.KUJI.Path }}"
@@ -121,6 +124,7 @@
         "code": "kujira_fin",
         "label": "Fin stETH-ETH",
         "msg": {
+          "owner": "kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse",
           "denoms": [
             {
               "native": "{{ .Denoms.stETH.Path }}"
@@ -142,6 +146,7 @@
         "code": "kujira_fin",
         "label": "Fin ETH-USK",
         "msg": {
+          "owner": "kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse",
           "denoms": [
             {
               "native": "{{ .Denoms.ETH.Path }}"
@@ -163,6 +168,7 @@
         "code": "kujira_fin",
         "label": "Fin USDC-USK",
         "msg": {
+          "owner": "kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse",
           "denoms": [
             {
               "native": "{{ .Denoms.USDC.Path }}"
@@ -184,6 +190,7 @@
         "code": "kujira_orca",
         "label": "Orca ETH-USK",
         "msg": {
+          "owner": "kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse",
           "bid_denom": "{{ .Denoms.USK.Path }}",
           "collateral_denom": "{{ .Denoms.ETH.Path }}",
           "bid_threshold": "10000000000",
@@ -200,6 +207,7 @@
         "code": "kujira_bow_staking",
         "label": "Bow Staking",
         "msg": {
+          "owner": "kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse",
           "incentive_fee": {
             "amount": "1000000",
             "denom": "{{ .Denoms.USK.Path }}"
@@ -215,6 +223,7 @@
         "label": "Bow KUJI-USK",
         "funds": "10000000ukuji",
         "msg": {
+          "owner": "kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse",
           "fin_contract": "{{ .Contracts.kujira_fin_kuji_usk.Address }}",
           "intervals": [
             "0.001",
@@ -244,6 +253,7 @@
         "label": "Bow stETH-ETH",
         "funds": "10000000ukuji",
         "msg": {
+          "owner": "kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse",
           "fin_contract": "{{ .Contracts.kujira_fin_steth_eth.Address }}",
           "adapter": {
             "oracle": [
@@ -281,6 +291,7 @@
         "label": "Bow ETH-USK",
         "funds": "10000000ukuji",
         "msg": {
+          "owner": "kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse",
           "fin_contract": "{{ .Contracts.kujira_fin_eth_usk.Address }}",
           "intervals": [
             "0.02",
@@ -308,6 +319,7 @@
         "label": "Bow USDC-USK",
         "funds": "10000000ukuji",
         "msg": {
+          "owner": "kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse",
           "fin_contract": "{{ .Contracts.kujira_fin_usdc_usk.Address }}",
           "strategy": {
             "target_price": "1",
@@ -335,6 +347,7 @@
         "code": "kujira_stable_market",
         "label": "USK Market ETH",
         "msg": {
+          "owner": "kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse",
           "stable_denom": "{{ .Denoms.USK.Path }}",
           "stable_denom_admin": "{{ .Contracts.kujira_stable_mint_usk.Address }}",
           "collateral_denom": "{{ .Denoms.ETH.Path }}",
@@ -365,6 +378,7 @@
         "code": "kujira_orca",
         "label": "Orca USK-KUJI",
         "msg": {
+          "owner": "kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse",
           "bid_denom": "{{ .Denoms.USK.Path }}",
           "collateral_denom": "{{ .Denoms.KUJI.Path }}",
           "bid_threshold": "10000000000",
@@ -383,6 +397,7 @@
         "code": "kujira_ghost_market",
         "label": "Ghost Market USK-KUJI",
         "msg": {
+          "owner": "kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse",
           "vault_addr": "{{ .Contracts.kujira_ghost_vault_usk.Address }}",
           "orca_addr": "{{ .Contracts.kujira_orca_usk_kuji.Address }}",
           "collateral_denom": "{{ .Denoms.KUJI.Path }}",
