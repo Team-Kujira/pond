@@ -633,11 +633,6 @@ func (d *Deployer) CreateContractMsgs(
 			return nil, err
 		}
 
-		_, found = contract.Msg["owner"]
-		if !found {
-			contract.Msg["owner"] = []byte(`"` + d.address + `"`)
-		}
-
 		hash := sha256.New()
 		hash.Write([]byte(contract.Label))
 		saltBase64 := base64.StdEncoding.EncodeToString(hash.Sum(nil))

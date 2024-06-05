@@ -344,7 +344,7 @@ If you are working on contracts that change a lot during the development, updati
 
 #### Contracts
 
-Pond instantiates all contracts from the `deployer` account, which also is set as the owner by default.
+Pond instantiates all contracts from the `deployer` account.
 
 To speed up the deployments, Pond handles contracts in batches which combine all instantiations into a single transaction:
 
