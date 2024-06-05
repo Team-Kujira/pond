@@ -289,9 +289,11 @@ Default plan files shipped with pond can be found in `$HOME/.pond/planfiles`.
 {
   "denom": "{{ .Denoms.USDC.Path }}",
   "address": "{{ .Contracts.my_contract.Address }}",
-  "code_id": "{{ .CodeIds.my_contract | int }}"
+  "code_id": "{{ .CodeIds.my_contract }} | int"
 }
 ```
+
+Note: To be able to use the resulting code id as an integer value, you need to add `| int` after the template string. Otherwise the code id is provided as a string.
 
 All deployments are done from the `deployer` account: `kujira1k3g54c2sc7g9mgzuzaukm9pvuzcjqy92nk9wse`
 
