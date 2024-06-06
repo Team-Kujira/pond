@@ -384,29 +384,28 @@ func (c *Chain) SubmitProposal(data []byte, option string) error {
 func (c *Chain) WaitForNode(name string) error {
 	c.logger.Debug().Str("node", name).Msg("wait for node")
 
-	command := []string{c.Command, "ps", "-qf", "name=" + name}
+	command := []string{
+		c.Command, "inspect", "--format", "'{{ json .State.Running }}'", name,
+	}
 	c.logger.Debug().Msg(strings.Join(command, " "))
 
-	var (
-		output []byte
-		err    error
-	)
-
 	retries := 10
+	running := false
 	for i := 0; i < retries; i++ {
-		output, err = utils.RunO(c.logger, command)
+		output, err := utils.RunO(c.logger, command)
 		if err != nil {
 			return err
 		}
 
-		if len(output) > 0 {
+		if strings.Contains(string(output), "true") {
+			running = true
 			break
 		}
 
 		time.Sleep(time.Millisecond * 200)
 	}
 
-	if len(output) == 0 {
+	if !running {
 		msg := "node not running"
 		c.logger.Error().Str("node", name).Msg(msg)
 		return fmt.Errorf(msg)
