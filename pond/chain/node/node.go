@@ -437,7 +437,8 @@ func (n *Node) createContainer(image string, init bool) error {
 		return utils.Run(n.logger, command)
 	}
 
-	for _, port := range []string{n.Ports.Api, n.Ports.App, n.Ports.Rpc} {
+	ports := []string{n.Ports.Api, n.Ports.App, n.Ports.Rpc, n.Ports.Grpc}
+	for _, port := range ports {
 		command = append(command, "-p")
 		command = append(command, fmt.Sprintf("%s:%s:%s", n.IpAddr, port, port))
 	}
