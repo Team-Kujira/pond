@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"pond/pond"
+	"pond/pond/chain"
+	"pond/pond/globals"
 	"pond/pond/templates"
 	"pond/utils"
 
@@ -22,6 +24,7 @@ var (
 	ApiUrl        string
 	RpcUrl        string
 	KujiraVersion string
+	Binary        string
 )
 
 // initCmd represents the init command
@@ -62,10 +65,28 @@ var initCmd = &cobra.Command{
 			"app_state/staking/params/unbonding_time": unbondingTime,
 		}
 
+		config := pond.Config{
+			Command:   "docker",
+			Namespace: Namespace,
+			Address:   ListenAddress,
+			ApiUrl:    ApiUrl,
+			RpcUrl:    RpcUrl,
+			Plans:     Contracts,
+			Chains: []chain.Config{{
+				Type:    "kujira",
+				TypeNum: 1,
+				Nodes:   Nodes,
+			}},
+			Versions: globals.Versions,
+		}
+
+		if KujiraVersion != "" {
+			config.Versions["kujira"] = KujiraVersion
+		}
+
 		pond, _ := pond.NewPond(LogLevel)
 		pond.Init(
-			"docker", Namespace, ListenAddress, ApiUrl, RpcUrl, KujiraVersion,
-			Chains, Contracts, Nodes, options,
+			config, Chains, options,
 		)
 	},
 }
@@ -80,6 +101,7 @@ func init() {
 	initCmd.PersistentFlags().StringVar(&ApiUrl, "api-url", "https://rest.cosmos.directory/kujira", "Set API URL")
 	initCmd.PersistentFlags().StringVar(&RpcUrl, "rpc-url", "https://rpc.cosmos.directory/kujira", "Set RPC URL")
 	initCmd.PersistentFlags().StringVar(&KujiraVersion, "kujira-version", "", "Set Kujira version")
+	initCmd.PersistentFlags().StringVar(&Binary, "binary", "", "Use local Kujira binary")
 	initCmd.PersistentFlags().BoolVar(&NoContracts, "no-contracts", false, "Don't deploy contracts on first start")
 
 	chains, err := templates.GetChains()
