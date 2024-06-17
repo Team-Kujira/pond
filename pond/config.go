@@ -17,6 +17,7 @@ type Config struct {
 	ApiUrl    string            `json:"api_url"`
 	RpcUrl    string            `json:"rpc_url"`
 	Address   string            `json:"address"`
+	Binary    string            `json:"binary"`
 }
 
 func (p *Pond) LoadConfig() error {

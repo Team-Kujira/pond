@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -34,9 +35,10 @@ type Ports struct {
 type Node struct {
 	logger    zerolog.Logger
 	initState bool
+	Local     bool
 	Image     string `json:"-"`        // ex.: docker.io/teamkujira/kujira:v0.8.4
 	Command   string `json:"-"`        // ex.: docker
-	Binary    string `json:"-"`        // ex.: kujirad
+	Binary    string `json:"-"`        // ex.: kujirad or /usr/bin/kujirad
 	Type      string `json:"-"`        // ex.: kujira
 	ChainId   string `json:"-"`        // ex.: kujira-1
 	Home      string `json:"-"`        // ex.: ~/.pond/kujira1-2
@@ -60,7 +62,7 @@ type Node struct {
 
 func NewNode(
 	logger zerolog.Logger,
-	command, address, chainType string,
+	command, binary, address, chainType string,
 	typeNum, nodeNum, chainNum uint,
 ) (Node, error) {
 	moniker := fmt.Sprintf("%s%d-%d", chainType, typeNum, nodeNum)
@@ -90,6 +92,7 @@ func NewNode(
 
 	node := Node{
 		logger:   logger,
+		Local:    false,
 		Type:     chainType,
 		Moniker:  moniker,
 		Home:     homeDir + "/.pond/" + moniker,
@@ -106,13 +109,17 @@ func NewNode(
 		IpAddr:   address,
 	}
 
+	if binary != "" {
+		node.Local = true
+		node.Binary = binary
+	}
+
 	var feeder string
-	if node.Command == "docker" {
+	if node.Command == "docker" && !node.Local {
 		node.Host = node.Moniker
 		feeder = fmt.Sprintf("feeder%d-%d", chainNum, nodeNum)
 	} else {
 		node.Host = "127.0.0.1"
-		feeder = node.Host
 	}
 
 	if chainNum == 1 {
@@ -127,11 +134,20 @@ func NewNode(
 	return node, nil
 }
 
-func (n *Node) Init(namespace string, amount int) error {
-	command := []string{
-		n.Command, "exec", "--user", n.Type, n.Moniker, n.Binary,
-		"init", n.Moniker, "--chain-id", n.ChainId,
+func (n *Node) NewCommand(command []string) []string {
+	if n.Local {
+		return append(command, []string{"--home", n.Home}...)
 	}
+
+	return append([]string{
+		n.Command, "exec", "--user", n.Type, n.Moniker,
+	}, command...)
+}
+
+func (n *Node) Init(namespace string, amount int) error {
+	command := n.NewCommand([]string{
+		n.Binary, "init", n.Moniker, "--chain-id", n.ChainId,
+	})
 
 	if n.Type != "terra2" {
 		command = append(command, []string{"--default-denom", n.Denom}...)
@@ -200,6 +216,14 @@ func (n *Node) Init(namespace string, amount int) error {
 }
 
 func (n *Node) AddGenesisAccounts(accounts []Account) error {
+	if n.Local {
+		return n.AddGenesisAccountsLocal(accounts)
+	}
+
+	return n.AddGenesisAccountsContainer(accounts)
+}
+
+func (n *Node) AddGenesisAccountsContainer(accounts []Account) error {
 	n.logger.Debug().Msg("add genesis accounts")
 
 	addresses := make([]string, len(accounts))
@@ -225,16 +249,35 @@ func (n *Node) AddGenesisAccounts(accounts []Account) error {
 	return utils.Run(n.logger, command)
 }
 
+func (n *Node) AddGenesisAccountsLocal(accounts []Account) error {
+	n.logger.Debug().Msg("add genesis accounts")
+
+	for _, account := range accounts {
+		command := []string{
+			n.Binary, "--home", n.Home, "genesis", "add-genesis-account",
+			account.Address, fmt.Sprintf("%d%s", account.Amount, n.Denom),
+		}
+
+		err := utils.Run(n.logger, command)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (n *Node) AddGenesisAccount(address string, amount int) error {
 	n.logger.Debug().
 		Str("address", address).
 		Msg("add genesis account")
 
-	command := []string{
-		n.Command, "exec", "--user", n.Type, "-d", n.Moniker, n.Binary,
-		"genesis", "add-genesis-account", address,
+	// TODO: if init is too slow, add '-d' for containers
+	// n.Command, "exec", "--user", n.Type, "-d", n.Moniker,
+	command := n.NewCommand([]string{
+		n.Binary, "genesis", "add-genesis-account", address,
 		strconv.Itoa(amount) + n.Denom,
-	}
+	})
 
 	return utils.Run(n.logger, command)
 }
@@ -242,12 +285,11 @@ func (n *Node) AddGenesisAccount(address string, amount int) error {
 func (n *Node) CreateGentx(amount int) error {
 	n.logger.Debug().Msg("create gentx")
 
-	command := []string{
-		n.Command, "exec", "--user", n.Type, n.Moniker, n.Binary,
-		"genesis", "gentx", "validator", strconv.Itoa(amount) + n.Denom,
-		"--chain-id", n.ChainId, "--keyring-backend", "test",
+	command := n.NewCommand([]string{
+		n.Binary, "genesis", "gentx", "validator", "--keyring-backend", "test",
+		strconv.Itoa(amount) + n.Denom, "--chain-id", n.ChainId,
 		"--output", "json",
-	}
+	})
 
 	err := utils.Run(n.logger, command)
 	if err != nil {
@@ -307,10 +349,9 @@ func (n *Node) CreateGentx(amount int) error {
 
 func (n *Node) CollectGentxs() error {
 	n.logger.Debug().Msg("collect gentxs")
-	command := []string{
-		n.Command, "exec", "--user", n.Type, n.Moniker, n.Binary,
-		"genesis", "collect-gentxs",
-	}
+	command := n.NewCommand([]string{
+		n.Binary, "genesis", "collect-gentxs",
+	})
 
 	return utils.Run(n.logger, command)
 }
@@ -319,9 +360,17 @@ func (n *Node) AddKey(wallet, mnemonic string) error {
 	n.logger.Debug().Str("wallet", wallet).Msg("add key")
 
 	command := []string{
-		n.Command, "exec", "--user", n.Type, "-i", n.Moniker,
 		n.Binary, "--keyring-backend", "test",
 		"keys", "add", wallet, "--recover",
+	}
+
+	if n.Local {
+		// just append home
+		command = n.NewCommand(command)
+	} else {
+		command = append([]string{
+			n.Command, "exec", "--user", n.Type, "-i", n.Moniker,
+		}, command...)
 	}
 
 	return utils.RunI(n.logger, command, mnemonic)
@@ -329,6 +378,19 @@ func (n *Node) AddKey(wallet, mnemonic string) error {
 
 func (n *Node) AddKeys(mnemonics map[string]string) error {
 	n.logger.Debug().Msg("add keys")
+
+	if n.Local {
+		n.logger.Debug().Msg("add keys")
+
+		for wallet, mnemnemonic := range mnemonics {
+			err := n.AddKey(wallet, mnemnemonic)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
 
 	wallets := []string{}
 	command := []string{
@@ -354,11 +416,10 @@ func (n *Node) AddKeys(mnemonics map[string]string) error {
 }
 
 func (n *Node) GetAddress(wallet string) (string, error) {
-	command := []string{
-		n.Command, "exec", "--user", n.Type, n.Moniker,
+	command := n.NewCommand([]string{
 		n.Binary, "--keyring-backend", "test",
 		"keys", "show", "-a", wallet,
-	}
+	})
 
 	output, err := utils.RunO(n.logger, command)
 	if err != nil {
@@ -371,10 +432,10 @@ func (n *Node) GetAddress(wallet string) (string, error) {
 }
 
 func (n *Node) GetAddresses() (map[string]string, error) {
-	command := []string{
-		n.Command, "exec", "--user", n.Type, n.Moniker, n.Binary,
-		"--keyring-backend", "test", "keys", "list", "--output", "json",
-	}
+	command := n.NewCommand([]string{
+		n.Binary, "--keyring-backend", "test",
+		"keys", "list", "--output", "json",
+	})
 
 	output, err := utils.RunO(n.logger, command)
 	if err != nil {
@@ -464,6 +525,26 @@ func (n *Node) error(err error) error {
 }
 
 func (n *Node) Start() error {
+	if n.Local {
+		pid, err := n.GetPid()
+		if err != nil {
+			return err
+		}
+
+		if pid != "" {
+			n.logger.Debug().Msg("node already running")
+			return nil
+		}
+
+		command := []string{
+			"nohup", n.Binary, "--home", n.Home, "start",
+		}
+
+		logfile := filepath.Join(n.Home, "kujirad.log")
+
+		return utils.RunB(n.logger, command, logfile)
+	}
+
 	if n.initState {
 		n.logger.Debug().Str("state", "init").Msg("start node")
 	} else {
@@ -478,15 +559,28 @@ func (n *Node) Start() error {
 func (n *Node) Stop() error {
 	n.logger.Info().Msg("stop node")
 
-	command := []string{n.Command, "stop", n.Moniker}
+	if !n.Local {
+		command := []string{n.Command, "stop", n.Moniker}
+		return utils.Run(n.logger, command)
+	}
 
-	return utils.Run(n.logger, command)
+	pid, err := n.GetPid()
+	if err != nil {
+		return err
+	}
+
+	if pid == "" {
+		err := fmt.Errorf("pid not found")
+		return n.error(err)
+	}
+
+	return utils.Run(n.logger, []string{"kill", pid})
 }
 
 func (n *Node) Query(args []string) ([]byte, error) {
-	command := []string{
-		n.Command, "exec", "--user", n.Type, n.Moniker, n.Binary, "query",
-	}
+	command := n.NewCommand([]string{
+		n.Binary, "query",
+	})
 
 	command = append(command, args...)
 
@@ -510,9 +604,9 @@ func (n *Node) Query(args []string) ([]byte, error) {
 }
 
 func (n *Node) Tx(args []string) ([]byte, error) {
-	command := []string{
-		n.Command, "exec", "--user", n.Type, n.Moniker, n.Binary, "tx",
-	}
+	command := n.NewCommand([]string{
+		n.Binary, "tx",
+	})
 
 	command = append(command, args...)
 	command = append(command, []string{
@@ -550,9 +644,9 @@ func (n *Node) Generate(args []string) ([]byte, error) {
 func (n *Node) Status() ([]byte, error) {
 	n.logger.Debug().Msg("get status")
 
-	command := []string{
-		n.Command, "exec", "--user", n.Type, n.Moniker, n.Binary, "status",
-	}
+	command := n.NewCommand([]string{
+		n.Binary, "status",
+	})
 
 	return utils.RunO(n.logger, command)
 }
@@ -588,4 +682,24 @@ func (n *Node) WaitForTx(hash string) error {
 	}
 
 	return err
+}
+
+func (n *Node) GetPid() (string, error) {
+	output, err := utils.RunO(n.logger, []string{"ps", "-a"})
+	if err != nil {
+		return "", err
+	}
+
+	var pid string
+
+	substr := fmt.Sprintf("%s --home %s start", n.Binary, n.Home)
+
+	for _, line := range strings.Split(string(output), "\n") {
+		if strings.Contains(line, substr) {
+			pid = strings.Split(line, " ")[0]
+			break
+		}
+	}
+
+	return pid, nil
 }

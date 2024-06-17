@@ -49,21 +49,23 @@ func (c *Chain) Init(namespace string, options map[string]string) error {
 		wg.Add(1)
 
 		go func(i int) {
-			err := c.Nodes[i].CreateInitContainer(image)
-			if err != nil {
-				wg.Done()
-				return
+			if !c.Nodes[i].Local {
+				err := c.Nodes[i].CreateInitContainer(image)
+				if err != nil {
+					wg.Done()
+					return
+				}
+
+				err = c.Nodes[i].Start()
+				if err != nil {
+					wg.Done()
+					return
+				}
+
+				c.WaitForNode(c.Nodes[i].Moniker)
 			}
 
-			err = c.Nodes[i].Start()
-			if err != nil {
-				wg.Done()
-				return
-			}
-
-			c.WaitForNode(c.Nodes[i].Moniker)
-
-			err = c.Nodes[i].Init(namespace, amount)
+			err := c.Nodes[i].Init(namespace, amount)
 			if err != nil {
 				wg.Done()
 				return
@@ -159,16 +161,19 @@ func (c *Chain) Init(namespace string, options map[string]string) error {
 	// Deploy configs and create run containers
 
 	for i := range c.Nodes {
-		wg.Add(2)
-		go func(i int) {
-			err := c.Nodes[i].CreateRunContainer(image)
-			if err != nil {
+		if !c.Nodes[i].Local {
+			wg.Add(1)
+			go func(i int) {
+				err := c.Nodes[i].CreateRunContainer(image)
+				if err != nil {
+					wg.Done()
+					c.error(err)
+				}
 				wg.Done()
-				c.error(err)
-			}
-			wg.Done()
-		}(i)
+			}(i)
+		}
 
+		wg.Add(1)
 		go func(i int) {
 			for _, name := range []string{"app", "config", "client"} {
 				c.logger.Debug().

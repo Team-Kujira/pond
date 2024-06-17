@@ -67,6 +67,7 @@ var initCmd = &cobra.Command{
 
 		config := pond.Config{
 			Command:   "docker",
+			Binary:    Binary,
 			Namespace: Namespace,
 			Address:   ListenAddress,
 			ApiUrl:    ApiUrl,
@@ -101,7 +102,7 @@ func init() {
 	initCmd.PersistentFlags().StringVar(&ApiUrl, "api-url", "https://rest.cosmos.directory/kujira", "Set API URL")
 	initCmd.PersistentFlags().StringVar(&RpcUrl, "rpc-url", "https://rpc.cosmos.directory/kujira", "Set RPC URL")
 	initCmd.PersistentFlags().StringVar(&KujiraVersion, "kujira-version", "", "Set Kujira version")
-	initCmd.PersistentFlags().StringVar(&Binary, "binary", "", "Use local Kujira binary")
+	initCmd.PersistentFlags().StringVar(&Binary, "binary", "", "Path to local Kujira binary")
 	initCmd.PersistentFlags().BoolVar(&NoContracts, "no-contracts", false, "Don't deploy contracts on first start")
 
 	chains, err := templates.GetChains()

@@ -36,7 +36,7 @@ type Config struct {
 
 func NewChain(
 	logger zerolog.Logger,
-	command, namespace, address, chainType string,
+	command, binary, namespace, address, chainType string,
 	typeNum, numNodes, chainNum uint,
 ) (Chain, error) {
 	chainId := fmt.Sprintf("%s-%d", chainType, typeNum)
@@ -56,7 +56,7 @@ func NewChain(
 
 	for i := uint(1); i <= numNodes; i++ {
 		node, err := node.NewNode(
-			logger, command, address, chainType, typeNum, i, chainNum,
+			logger, command, binary, address, chainType, typeNum, i, chainNum,
 		)
 		if err != nil {
 			logger.Err(err).Msg("")
