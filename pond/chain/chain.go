@@ -289,9 +289,14 @@ func (c *Chain) SubmitProposal(data []byte, option string) error {
 
 	os.WriteFile(file.Name(), data, 0o644)
 
+	path := "/home/kujira/.kujira"
+	if node.Local {
+		path = node.Home
+	}
+
 	args := []string{
 		"gov", "submit-proposal",
-		"/home/kujira/.kujira/" + filepath.Base(file.Name()),
+		filepath.Join(path, filepath.Base(file.Name())),
 		"--from", "validator", "--gas", "auto", "--gas-adjustment", "1.5",
 	}
 

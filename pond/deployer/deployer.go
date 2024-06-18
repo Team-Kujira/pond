@@ -863,8 +863,13 @@ func (d *Deployer) SignAndSend(msgs []json.RawMessage) error {
 
 	// sign
 	d.logger.Debug().Msg("sign tx")
+
+	path := "/home/kujira/.kujira"
+	if d.node.Local {
+		path = d.node.Home
+	}
 	output, err := d.node.Tx([]string{
-		"sign", "/home/kujira/.kujira/" + filepath.Base(unsigned.Name()),
+		"sign", filepath.Join(path, filepath.Base(unsigned.Name())),
 		"--from", "deployer", "--gas", "1000000000",
 	})
 	if err != nil {
@@ -885,8 +890,12 @@ func (d *Deployer) SignAndSend(msgs []json.RawMessage) error {
 	// broadcast
 	d.logger.Debug().Msg("broadcast tx")
 
+	path = "/home/kujira/.kujira"
+	if d.node.Local {
+		path = d.node.Home
+	}
 	output, err = d.node.Tx([]string{
-		"broadcast", "/home/kujira/.kujira/" + filepath.Base(signed.Name()),
+		"broadcast", filepath.Join(path, filepath.Base(signed.Name())),
 		"--gas", "auto", "--gas-adjustment", "1.5",
 	})
 	if err != nil {
