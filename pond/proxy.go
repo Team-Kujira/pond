@@ -33,7 +33,7 @@ func NewProxy(logger zerolog.Logger, command, address string) (Proxy, error) {
 	}, nil
 }
 
-func (p *Proxy) Init(namespace string) error {
+func (p *Proxy) Init(namespace string, local bool) error {
 	version, err := utils.GetVersion(p.logger, "proxy")
 	if err != nil {
 		p.logger.Err(err).Msg("")
@@ -46,6 +46,10 @@ func (p *Proxy) Init(namespace string) error {
 
 	if p.Command == "docker" {
 		config.Host = "kujira1-1"
+	}
+
+	if local {
+		config.Host = "host.docker.internal"
 	}
 
 	src := "config/proxy.conf"

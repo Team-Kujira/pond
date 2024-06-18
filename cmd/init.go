@@ -21,6 +21,7 @@ var (
 	UnbondingTime uint
 	ListenAddress string
 	NoContracts   bool
+	Empty         bool
 	ApiUrl        string
 	RpcUrl        string
 	KujiraVersion string
@@ -33,7 +34,7 @@ var initCmd = &cobra.Command{
 	Short: "Initialize a new pond environment",
 	// Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		if NoContracts {
+		if NoContracts || Empty {
 			Contracts = []string{}
 		}
 
@@ -104,6 +105,9 @@ func init() {
 	initCmd.PersistentFlags().StringVar(&KujiraVersion, "kujira-version", "", "Set Kujira version")
 	initCmd.PersistentFlags().StringVar(&Binary, "binary", "", "Path to local Kujira binary")
 	initCmd.PersistentFlags().BoolVar(&NoContracts, "no-contracts", false, "Don't deploy contracts on first start")
+	initCmd.PersistentFlags().BoolVar(&Empty, "empty", false, "Don't deploy contracts on first start")
+
+	initCmd.PersistentFlags().MarkDeprecated("no-contracts", "please use '--empty instead'")
 
 	chains, err := templates.GetChains()
 	check(err)

@@ -20,6 +20,11 @@ func (p *Pond) Init(
 ) error {
 	p.logger.Info().Msg("init pond")
 
+	local := false
+	if config.Binary != "" {
+		local = true
+	}
+
 	_, err := os.Stat(p.home)
 	if err == nil {
 		var input string
@@ -130,7 +135,7 @@ func (p *Pond) Init(
 
 	wg.Add(1)
 	go func() {
-		p.proxy.Init(p.config.Namespace)
+		p.proxy.Init(p.config.Namespace, local)
 		wg.Done()
 	}()
 

@@ -97,6 +97,8 @@ func run(
 		if err != nil {
 			return nil, err
 		}
+
+		return nil, nil
 	}
 
 	err := cmd.Run()
