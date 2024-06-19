@@ -533,7 +533,10 @@ func (n *Node) Start() error {
 
 		if pid != "" {
 			n.logger.Debug().Msg("node already running")
-			return nil
+			err := n.Stop()
+			if err != nil {
+				return err
+			}
 		}
 
 		command := []string{
@@ -558,6 +561,8 @@ func (n *Node) Start() error {
 
 func (n *Node) Stop() error {
 	n.logger.Info().Msg("stop node")
+
+	n.RemoveTemp()
 
 	if !n.Local {
 		command := []string{n.Command, "stop", n.Moniker}
@@ -702,4 +707,32 @@ func (n *Node) GetPid() (string, error) {
 	}
 
 	return pid, nil
+}
+
+func (n *Node) CreateTemp(data []byte, pattern string) (string, error) {
+	tmpdir := n.Home + "/tmp"
+	err := os.MkdirAll(tmpdir, 0o755)
+	if err != nil {
+		return "", n.error(err)
+	}
+
+	tmp, err := os.CreateTemp(tmpdir, pattern)
+	if err != nil {
+		return "", n.error(err)
+	}
+
+	err = os.WriteFile(tmp.Name(), data, 0o644)
+	if err != nil {
+		return "", n.error(err)
+	}
+
+	if n.Local {
+		return tmp.Name(), nil
+	}
+
+	return "/home/kujira/.kujira/tmp/" + filepath.Base(tmp.Name()), nil
+}
+
+func (n *Node) RemoveTemp() error {
+	return os.RemoveAll(n.Home + "/tmp")
 }

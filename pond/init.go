@@ -43,6 +43,8 @@ func (p *Pond) Init(
 		}
 	}
 
+	p.Stop()
+
 	p.info = Info{
 		Validators: map[string][]node.Node{},
 		Accounts:   map[string]Account{},

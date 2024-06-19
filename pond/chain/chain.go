@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -281,22 +280,13 @@ func (c *Chain) WaitBlocks(amount int64) error {
 func (c *Chain) SubmitProposal(data []byte, option string) error {
 	node := c.Nodes[0]
 
-	file, err := os.CreateTemp(node.Home, "wasm")
+	filename, err := node.CreateTemp(data, "json")
 	if err != nil {
-		return c.error(err)
-	}
-	defer os.Remove(file.Name())
-
-	os.WriteFile(file.Name(), data, 0o644)
-
-	path := "/home/kujira/.kujira"
-	if node.Local {
-		path = node.Home
+		return err
 	}
 
 	args := []string{
-		"gov", "submit-proposal",
-		filepath.Join(path, filepath.Base(file.Name())),
+		"gov", "submit-proposal", filename,
 		"--from", "validator", "--gas", "auto", "--gas-adjustment", "1.5",
 	}
 
