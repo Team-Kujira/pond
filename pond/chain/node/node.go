@@ -575,8 +575,8 @@ func (n *Node) Stop() error {
 	}
 
 	if pid == "" {
-		err := fmt.Errorf("pid not found")
-		return n.error(err)
+		n.logger.Debug().Msg("no pid found")
+		return nil
 	}
 
 	return utils.Run(n.logger, []string{"kill", pid})
