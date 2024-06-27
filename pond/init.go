@@ -14,12 +14,16 @@ import (
 )
 
 func (p *Pond) Init(
-	command, namespace, address, api, rpc, version string,
-	chains, plans []string,
-	nodes uint,
+	config Config,
+	chains []string,
 	options map[string]string,
 ) error {
 	p.logger.Info().Msg("init pond")
+
+	local := false
+	if config.Binary != "" {
+		local = true
+	}
 
 	_, err := os.Stat(p.home)
 	if err == nil {
@@ -39,27 +43,14 @@ func (p *Pond) Init(
 		}
 	}
 
+	p.Stop()
+
 	p.info = Info{
 		Validators: map[string][]node.Node{},
 		Accounts:   map[string]Account{},
 	}
 
-	p.config = Config{
-		Command:   command,
-		Namespace: namespace,
-		Versions:  globals.Versions,
-		Chains: []chain.Config{
-			{Type: "kujira", TypeNum: 1, Nodes: nodes},
-		},
-		Plans:   plans,
-		ApiUrl:  api,
-		RpcUrl:  rpc,
-		Address: address,
-	}
-
-	if version != "" {
-		p.config.Versions["kujira"] = version
-	}
+	p.config = config
 
 	types := map[string]int{
 		"kujira": 1,
@@ -97,7 +88,7 @@ func (p *Pond) Init(
 		p.error(err)
 	}
 
-	plans, err = templates.GetPlans()
+	plans, err := templates.GetPlans()
 	if err != nil {
 		p.error(err)
 	}
@@ -135,7 +126,7 @@ func (p *Pond) Init(
 	for i := range p.chains {
 		wg.Add(1)
 		go func(i int) {
-			p.chains[i].Init(namespace, options)
+			p.chains[i].Init(p.config.Namespace, options)
 
 			mtx.Lock()
 			p.info.Validators[p.chains[i].ChainId] = p.chains[i].Nodes
@@ -146,14 +137,14 @@ func (p *Pond) Init(
 
 	wg.Add(1)
 	go func() {
-		p.proxy.Init(namespace)
+		p.proxy.Init(p.config.Namespace, local)
 		wg.Done()
 	}()
 
 	wg.Wait()
 
 	if len(p.chains) > 1 {
-		p.relayer.Init(namespace)
+		p.relayer.Init(p.config.Namespace)
 	}
 
 	p.info.Accounts = map[string]Account{}

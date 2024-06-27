@@ -218,16 +218,13 @@ func (d *Deployer) DeployWasmFile(filename string) error {
 func (d *Deployer) DeployCode(data []byte) error {
 	d.logger.Debug().Msg("deploy code")
 
-	file, err := os.CreateTemp(d.node.Home, "wasm")
+	filename, err := d.node.CreateTemp(data, "wasm")
 	if err != nil {
-		return d.error(err)
+		return err
 	}
-	defer os.Remove(file.Name())
-
-	os.WriteFile(file.Name(), data, 0o644)
 
 	args := []string{
-		"wasm", "store", "/home/kujira/.kujira/" + filepath.Base(file.Name()),
+		"wasm", "store", filename,
 		"--from", "deployer", "--gas", "auto", "--gas-adjustment", "1.5",
 	}
 
@@ -848,36 +845,23 @@ func (d *Deployer) SignAndSend(msgs []json.RawMessage) error {
 
 	d.logger.Trace().Msg(string(data))
 
-	unsigned, err := os.CreateTemp(d.node.Home, "tx")
+	unsigned, err := d.node.CreateTemp(msg, "tx")
 	if err != nil {
-		return d.error(err)
+		return err
 	}
-	defer os.Remove(unsigned.Name())
-
-	err = os.WriteFile(unsigned.Name(), msg, 0o644)
-	if err != nil {
-		return d.error(err)
-	}
-
-	os.WriteFile("/tmp/unsigned.json", msg, 0o644)
 
 	// sign
 	d.logger.Debug().Msg("sign tx")
+
 	output, err := d.node.Tx([]string{
-		"sign", "/home/kujira/.kujira/" + filepath.Base(unsigned.Name()),
+		"sign", unsigned,
 		"--from", "deployer", "--gas", "1000000000",
 	})
 	if err != nil {
 		return err
 	}
 
-	signed, err := os.CreateTemp(d.node.Home, "tx")
-	if err != nil {
-		return d.error(err)
-	}
-	defer os.Remove(signed.Name())
-
-	err = os.WriteFile(signed.Name(), output, 0o644)
+	signed, err := d.node.CreateTemp(output, "tx")
 	if err != nil {
 		return d.error(err)
 	}
@@ -886,7 +870,7 @@ func (d *Deployer) SignAndSend(msgs []json.RawMessage) error {
 	d.logger.Debug().Msg("broadcast tx")
 
 	output, err = d.node.Tx([]string{
-		"broadcast", "/home/kujira/.kujira/" + filepath.Base(signed.Name()),
+		"broadcast", signed,
 		"--gas", "auto", "--gas-adjustment", "1.5",
 	})
 	if err != nil {

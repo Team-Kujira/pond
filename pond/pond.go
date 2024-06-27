@@ -81,9 +81,16 @@ func NewPond(logLevel string) (Pond, error) {
 
 func (p *Pond) init() error {
 	for i, config := range p.config.Chains {
+		// Use provided local binary for kujira-1 only
+		binary := ""
+		if i == 0 {
+			binary = p.config.Binary
+		}
+
 		chain, err := chain.NewChain(
 			p.logger,
 			p.config.Command,
+			binary,
 			p.config.Namespace,
 			p.config.Address,
 			config.Type,
@@ -166,7 +173,19 @@ func (p *Pond) Start() error {
 	p.logger.Info().Msg("wait for pond to start")
 
 	address := net.JoinHostPort(p.config.Address, p.chains[0].Nodes[0].Ports.Rpc)
-	conn, err := net.DialTimeout("tcp", address, time.Second*5)
+
+	var err error
+	var conn net.Conn
+
+	for i := 0; i < 5; i++ {
+		conn, err = net.DialTimeout("tcp", address, time.Second*5)
+		if err != nil {
+			time.Sleep(time.Millisecond * 100)
+		} else {
+			break
+		}
+	}
+
 	if err != nil {
 		return p.error(err)
 	}

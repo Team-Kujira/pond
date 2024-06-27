@@ -81,11 +81,21 @@ pond init --unbonding-time 300
 Pond uses the [cosmos.directory](https://cosmos.directory/kujira) proxy to get data from public API/RPC nodes. Override them with:
 
 ```text
-node init --api-url https://my.api.node
+pond init --api-url https://my.api.node
 ```
 
 ```text
-node init --rpc-url https://my.rpc.node
+pond init --rpc-url https://my.rpc.node
+```
+
+### Local Binary
+
+In case you need a custom Kujira version, you can use a local kujirad binary. The log output is written to `$HOME/.pond/kujira1-<N>/kujirad.log`
+
+:warning: **Only works for kujirad >= v1.0.0**
+
+```text
+pond init --binary /path/to/my/kujirad
 ```
 
 ## Start

@@ -125,7 +125,7 @@ enable = true
 swagger = true
 
 # Address defines the API server to listen on.
-address = "tcp://0.0.0.0:{{ .Ports.Api }}"
+address = "tcp://{{ if .Local }}127.0.0.1{{ else }}0.0.0.0{{ end }}:{{ .Ports.Api }}"
 
 # MaxOpenConnections defines the number of maximum open connections.
 max-open-connections = 1000
@@ -152,7 +152,7 @@ enabled-unsafe-cors = false
 enable = true
 
 # Address defines the gRPC server address to bind to.
-address = "0.0.0.0:{{ .Ports.Grpc }}"
+address = "{{ if .Local }}127.0.0.1{{ else }}0.0.0.0{{ end }}:{{ .Ports.Grpc }}"
 
 # MaxRecvMsgSize defines the max message size in bytes the server can receive.
 # The default value is 10MB.

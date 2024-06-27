@@ -22,24 +22,31 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+func RunB(logger zerolog.Logger, command []string, logfile string) error {
+	_, err := run(logger, command, "", true, logfile)
+	return err
+}
+
 func RunI(logger zerolog.Logger, command []string, input string) error {
-	_, err := run(logger, command, input)
+	_, err := run(logger, command, input, false, "")
 	return err
 }
 
 func Run(logger zerolog.Logger, command []string) error {
-	_, err := run(logger, command, "")
+	_, err := run(logger, command, "", false, "")
 	return err
 }
 
 func RunO(logger zerolog.Logger, command []string) ([]byte, error) {
-	return run(logger, command, "")
+	return run(logger, command, "", false, "")
 }
 
 func run(
 	logger zerolog.Logger,
 	command []string,
 	input string,
+	background bool,
+	logfile string,
 ) ([]byte, error) {
 	if command[0] == "docker" && command[1] == "container" && command[2] == "create" {
 		user, err := user.Current()
@@ -60,8 +67,17 @@ func run(
 	var stderr, stdout bytes.Buffer
 
 	cmd := exec.Command(command[0], command[1:]...)
-	cmd.Stderr = &stderr
-	cmd.Stdout = &stdout
+	if background {
+		file, err := os.Create(logfile)
+		if err != nil {
+			return nil, err
+		}
+		cmd.Stderr = file
+		cmd.Stdout = file
+	} else {
+		cmd.Stderr = &stderr
+		cmd.Stdout = &stdout
+	}
 
 	if input != "" {
 		stdin, err := cmd.StdinPipe()
@@ -75,6 +91,16 @@ func run(
 			io.WriteString(stdin, input)
 		}()
 	}
+
+	if background {
+		err := cmd.Start()
+		if err != nil {
+			return nil, err
+		}
+
+		return nil, nil
+	}
+
 	err := cmd.Run()
 	if err != nil {
 		logger.Err(err).Msg(stderr.String())

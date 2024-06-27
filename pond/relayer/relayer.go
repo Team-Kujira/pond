@@ -76,9 +76,14 @@ func (r *Relayer) Init(namespace string) error {
 			return err
 		}
 
+		host := node.Host
+		if node.Local {
+			host = "host.docker.internal"
+		}
+
 		chain := NewChainConfig()
 		chain.Value.KeyDirectory = fmt.Sprintf("/relayer/keys/%s", node.ChainId)
-		chain.Value.RpcAddr = fmt.Sprintf("http://%s:%s", node.Host, node.Ports.Rpc)
+		chain.Value.RpcAddr = fmt.Sprintf("http://%s:%s", host, node.Ports.Rpc)
 		chain.Value.AccountPrefix = info.Prefix
 		chain.Value.GasPrices = "0.01" + info.Denom
 		chain.Value.ChainId = node.ChainId
