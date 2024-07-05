@@ -26,6 +26,7 @@ var (
 	RpcUrl        string
 	KujiraVersion string
 	Binary        string
+	Horcrux       bool
 )
 
 // initCmd represents the init command
@@ -66,6 +67,11 @@ var initCmd = &cobra.Command{
 			"app_state/staking/params/unbonding_time": unbondingTime,
 		}
 
+		var signer string
+		if Horcrux {
+			signer = "horcrux"
+		}
+
 		config := pond.Config{
 			Command:   "docker",
 			Binary:    Binary,
@@ -79,7 +85,8 @@ var initCmd = &cobra.Command{
 				TypeNum: 1,
 				Nodes:   Nodes,
 			}},
-			Versions: globals.Versions,
+			Versions:     globals.Versions,
+			RemoteSigner: signer,
 		}
 
 		if KujiraVersion != "" {
