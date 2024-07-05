@@ -7,4 +7,5 @@ var Versions = map[string]string{
 	"feeder":    "api-only-2",
 	"relayer":   "v2.5.2-2",
 	"proxy":     "v1.0.0-2",
+	"dydx":      "v5.0.6-1-arm64",
 }

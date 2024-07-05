@@ -231,10 +231,19 @@ func (n *Node) AddGenesisAccountsContainer(accounts []Account) error {
 		n.Command, "exec", "--user", n.Type,
 	}
 
+	// add zeroes as string because it doesn fit into int64
+	zeroes := ""
+	config, found := globals.Chains[n.Type]
+	if found {
+		if config.Denom != "" && config.Denom[:1] == "a" {
+			zeroes = "000000000000"
+		}
+	}
+
 	for i, account := range accounts {
 		command = append(command, []string{
 			"-e", fmt.Sprintf(
-				"%s=%d%s", account.Address, account.Amount, n.Denom),
+				"%s=%d%s%s", account.Address, account.Amount, zeroes, n.Denom),
 		}...)
 		addresses[i] = account.Address
 	}
@@ -245,6 +254,11 @@ func (n *Node) AddGenesisAccountsContainer(accounts []Account) error {
 			%s genesis add-genesis-account $address ${!address}
 		done`, strings.Join(addresses, " "), n.Binary,
 	))
+
+	if n.Type == "dydx" {
+		index := len(command) - 1
+		command[index] = strings.Replace(command[index], " genesis ", " ", -1)
+	}
 
 	return utils.Run(n.logger, command)
 }
@@ -272,26 +286,52 @@ func (n *Node) AddGenesisAccount(address string, amount int) error {
 		Str("address", address).
 		Msg("add genesis account")
 
+	// add zeroes as string because it doesn fit into int64
+	zeroes := ""
+	config, found := globals.Chains[n.Type]
+	if found {
+		if config.Denom != "" && config.Denom[:1] == "a" {
+			zeroes = "000000000000"
+		}
+	}
+
 	// TODO: if init is too slow, add '-d' for containers
 	// n.Command, "exec", "--user", n.Type, "-d", n.Moniker,
-	command := n.NewCommand([]string{
+	command := []string{
 		n.Binary, "genesis", "add-genesis-account", address,
-		strconv.Itoa(amount) + n.Denom,
-	})
+		fmt.Sprintf("%d%s%s", amount, zeroes, n.Denom),
+	}
 
-	return utils.Run(n.logger, command)
+	if n.Type == "dydx" {
+		command = append(command[:1], command[2:]...)
+	}
+
+	return utils.Run(n.logger, n.NewCommand(command))
 }
 
 func (n *Node) CreateGentx(amount int) error {
 	n.logger.Debug().Msg("create gentx")
 
-	command := n.NewCommand([]string{
-		n.Binary, "genesis", "gentx", "validator", "--keyring-backend", "test",
-		strconv.Itoa(amount) + n.Denom, "--chain-id", n.ChainId,
-		"--output", "json",
-	})
+	// add zeroes as string because it doesn fit into int64
+	zeroes := ""
+	config, found := globals.Chains[n.Type]
+	if found {
+		if config.Denom != "" && config.Denom[:1] == "a" {
+			zeroes = "000000000000"
+		}
+	}
 
-	err := utils.Run(n.logger, command)
+	command := []string{
+		n.Binary, "genesis", "gentx", "validator", "--keyring-backend", "test",
+		fmt.Sprintf("%d%s%s", amount, zeroes, n.Denom), "--chain-id", n.ChainId,
+		"--output", "json",
+	}
+
+	if n.Type == "dydx" {
+		command = append(command[:1], command[2:]...)
+	}
+
+	err := utils.Run(n.logger, n.NewCommand(command))
 	if err != nil {
 		return err
 	}
@@ -349,11 +389,15 @@ func (n *Node) CreateGentx(amount int) error {
 
 func (n *Node) CollectGentxs() error {
 	n.logger.Debug().Msg("collect gentxs")
-	command := n.NewCommand([]string{
+	command := []string{
 		n.Binary, "genesis", "collect-gentxs",
-	})
+	}
 
-	return utils.Run(n.logger, command)
+	if n.Type == "dydx" {
+		command = append(command[:1], command[2:]...)
+	}
+
+	return utils.Run(n.logger, n.NewCommand(command))
 }
 
 func (n *Node) AddKey(wallet, mnemonic string) error {
@@ -507,6 +551,13 @@ func (n *Node) createContainer(image string, init bool) error {
 	command = append(command, []string{
 		image, n.Binary, "start",
 	}...)
+
+	if n.Type == "dydx" {
+		command = append(command, []string{
+			"--bridge-daemon-eth-rpc-endpoint",
+			"https://rpc.ankr.com/eth",
+		}...)
+	}
 
 	return utils.Run(n.logger, command)
 }

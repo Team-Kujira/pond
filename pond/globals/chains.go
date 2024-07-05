@@ -26,4 +26,10 @@ var Chains = map[string]Chain{
 		Prefix:  "terra",
 		Home:    ".terra",
 	},
+	"dydx": {
+		Denom:   "adydx",
+		Command: "dydxprotocold",
+		Prefix:  "dydx",
+		Home:    ".dydxprotocol",
+	},
 }

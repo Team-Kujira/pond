@@ -85,7 +85,11 @@ func (r *Relayer) Init(namespace string) error {
 		chain.Value.KeyDirectory = fmt.Sprintf("/relayer/keys/%s", node.ChainId)
 		chain.Value.RpcAddr = fmt.Sprintf("http://%s:%s", host, node.Ports.Rpc)
 		chain.Value.AccountPrefix = info.Prefix
-		chain.Value.GasPrices = "0.01" + info.Denom
+		if info.Prefix == "dydx" {
+			chain.Value.GasPrices = "10000000000" + info.Denom
+		} else {
+			chain.Value.GasPrices = "0.01" + info.Denom
+		}
 		chain.Value.ChainId = node.ChainId
 
 		config.Chains[node.ChainId] = chain
