@@ -1,6 +1,7 @@
 package pond
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -463,6 +464,29 @@ func (p *Pond) SubmitProposal(filename, option string) error {
 	}
 
 	return p.chains[0].SubmitProposal(data, option)
+}
+
+func (p *Pond) Upgrade() error {
+	node := p.chains[0].Nodes[0]
+
+	// Get voting period
+	var params struct {
+		Params struct {
+			VotingPeriod time.Duration `json:"voting_period"`
+		} `json:"params"`
+	}
+
+	output, err := node.Query([]string{"gov", "params"})
+	if err != nil {
+		return p.error(err)
+	}
+
+	err = json.Unmarshal(output, &params)
+	if err != nil {
+		return p.error(err)
+	}
+
+	return nil
 }
 
 func (p *Pond) error(err error) error {
