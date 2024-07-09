@@ -1,9 +1,10 @@
-package horcrux
+package signer
 
 import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"pond/utils"
 
@@ -17,44 +18,46 @@ type Horcrux struct {
 	Command string
 	Home    string
 	Port    string
-	IpAddr  string
+	NodeUrl string
 }
 
 func NewHorcrux(
 	logger zerolog.Logger,
-	command, address string,
-	chainNum, nodeNum uint,
-) (Horcrux, error) {
-	name := fmt.Sprintf("horcrux%d-%d", chainNum, nodeNum)
-	port := strconv.Itoa(int(100+chainNum*10+nodeNum)) + "71"
+	config Config,
+) (*Horcrux, error) {
+	name := fmt.Sprintf("horcrux%d-%d", config.ChainNum, config.NodeNum)
 
 	logger = logger.With().Str("node", name).Logger()
 
 	home, err := os.UserHomeDir()
 	if err != nil {
 		logger.Error().Msg("could not get home directory")
-		return Horcrux{}, err
+		return nil, err
 	}
+
+	base := strconv.Itoa(int(100 + config.ChainNum*10 + config.NodeNum))
 
 	Horcrux := Horcrux{
 		logger:  logger,
-		Command: command,
+		Command: config.Command,
 		Name:    name,
 		Home:    home + "/.pond/" + name,
-		Port:    port,
-		IpAddr:  address,
+		Port:    base + "22",
+		NodeUrl: config.NodeUrl,
 	}
 
-	return Horcrux, nil
+	return &Horcrux, nil
 }
 
-func (h *Horcrux) Init(namespace string) error {
+func (h *Horcrux) Init(namespace, keyfile string) error {
+	h.logger.Debug().Msg("init")
+
 	version, err := utils.GetVersion(h.logger, "horcrux")
 	if err != nil {
 		return h.error(err)
 	}
 
-	os.MkdirAll(h.Home+"/.horcrux", 0o755)
+	os.MkdirAll(h.Home+"/state", 0o755)
 
 	image := fmt.Sprintf("docker.io/%s/horcrux:%s", namespace, version)
 
@@ -62,6 +65,57 @@ func (h *Horcrux) Init(namespace string) error {
 	if err != nil {
 		return h.error(err)
 	}
+
+	h.Start()
+
+	time.Sleep(time.Second)
+
+	src := "config/horcrux.yaml"
+	dst := h.Home + "/config.yaml"
+
+	err = utils.Template(src, dst, h)
+	if err != nil {
+		return h.error(err)
+	}
+
+	src = keyfile
+	dst = h.Home + "/priv_validator_key.json"
+
+	err = utils.CopyFile(h.logger, src, dst)
+	if err != nil {
+		return err
+	}
+
+	time.Sleep(time.Second)
+
+	command := h.NewCommand([]string{
+		"create-ecies-shards", "--shards", "1",
+	})
+
+	utils.Run(h.logger, command)
+
+	command = h.NewCommand([]string{
+		"create-ed25519-shards", "--chain-id", "kujira-1",
+		"--key-file", "priv_validator_key.json",
+		"--threshold", "1", "--shards", "1",
+	})
+
+	utils.Run(h.logger, command)
+
+	for _, filename := range []string{"ecies_keys", "kujira-1_shard"} {
+		src := fmt.Sprintf("%s/cosigner_1/%s.json", h.Home, filename)
+		dst := fmt.Sprintf("%s/%s.json", h.Home, filename)
+		utils.CopyFile(h.logger, src, dst)
+	}
+
+	h.RemoveContainer()
+
+	h.CreateContainer(image, false)
+
+	// command = []string{
+	// 	h.Command, "exec", "--user", "horcrux",
+	// 	"create-ecies-shards", "--shards", "1",
+	// }
 
 	// src := "config/kujira/Horcrux.toml"
 	// dst := fmt.Sprintf("%s/config.toml", h.Home)
@@ -117,7 +171,9 @@ func (h *Horcrux) CreateContainer(image string, init bool) error {
 }
 
 func (h *Horcrux) Start() error {
-	h.logger.Info().Msg("start node")
+	if !h.init {
+		h.logger.Info().Msg("start node")
+	}
 
 	command := []string{h.Command, "start", h.Name}
 
@@ -135,4 +191,11 @@ func (h *Horcrux) Stop() error {
 func (h *Horcrux) error(err error) error {
 	h.logger.Err(err).Msg("")
 	return err
+}
+
+func (h *Horcrux) NewCommand(command []string) []string {
+	return append([]string{
+		h.Command, "exec", "--user", "horcrux",
+		"-w", "/home/horcrux/.horcrux", h.Name, "horcrux",
+	}, command...)
 }

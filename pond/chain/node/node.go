@@ -12,6 +12,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"pond/pond/chain/node/signer"
 	"pond/pond/globals"
 	"pond/utils"
 )
@@ -30,46 +31,55 @@ type Ports struct {
 	Grpc   string // ex.: 11190
 	Pprof  string // ex.: 11160
 	Rpc    string // ex.: 11157
+	Signer string // ex.: 11159
 }
 
 type Node struct {
 	logger    zerolog.Logger
 	initState bool
 	Local     bool
-	Image     string `json:"-"`        // ex.: docker.io/teamkujira/kujira:v0.8.4
-	Command   string `json:"-"`        // ex.: docker
-	Binary    string `json:"-"`        // ex.: kujirad or /usr/bin/kujirad
-	Type      string `json:"-"`        // ex.: kujira
-	ChainId   string `json:"-"`        // ex.: kujira-1
-	Home      string `json:"-"`        // ex.: ~/.pond/kujira1-2
-	Denom     string `json:"-"`        // ex.: ukuji
-	Moniker   string `json:"moniker"`  // ex.: kujira1-2
-	Mnemonic  string `json:"mnemonic"` // ex.: symbol rebuild hotel chief ensure hand coach ...
-	NodeId    string `json:"node_id"`  // ex.: bf26617b40af84e1004c5e345bbbf7da12f121b3
-	Address   string `json:"address"`  // ex.: kujira1r8u3eyf0axnsq9myrgtemtc9xpapxcezr6ek46
-	Valoper   string `json:"valoper"`  // ex.: kujiravaloper1r8u3eyf0axnsq9myrgtemtc9xpapxcezy029f4
-	Peers     string `json:"-"`        // ex.: bf26617b40af84e1004c5e345bbbf7da12f121b3@kujira1-2:11256,...
-	Host      string `json:"-"`        // ex.: kujira1-1 or 127.0.0.1
-	Ports     Ports  `json:"-"`
-	ApiUrl    string `json:"api_url"`
-	AppUrl    string `json:"app_url"`
-	RpcUrl    string `json:"rpc_url"`
-	GrpcUrl   string `json:"grpc_url"`
-	FeederUrl string `json:"feeder_url"`
-	OracleUrl string `json:"-"`
-	IpAddr    string `json:"-"`
+	Image     string        `json:"-"`        // ex.: docker.io/teamkujira/kujira:v0.8.4
+	Command   string        `json:"-"`        // ex.: docker
+	Binary    string        `json:"-"`        // ex.: kujirad or /usr/bin/kujirad
+	Type      string        `json:"-"`        // ex.: kujira
+	ChainId   string        `json:"-"`        // ex.: kujira-1
+	Home      string        `json:"-"`        // ex.: ~/.pond/kujira1-2
+	Denom     string        `json:"-"`        // ex.: ukuji
+	Moniker   string        `json:"moniker"`  // ex.: kujira1-2
+	Mnemonic  string        `json:"mnemonic"` // ex.: symbol rebuild hotel chief ensure hand coach ...
+	NodeId    string        `json:"node_id"`  // ex.: bf26617b40af84e1004c5e345bbbf7da12f121b3
+	Address   string        `json:"address"`  // ex.: kujira1r8u3eyf0axnsq9myrgtemtc9xpapxcezr6ek46
+	Valoper   string        `json:"valoper"`  // ex.: kujiravaloper1r8u3eyf0axnsq9myrgtemtc9xpapxcezy029f4
+	Peers     string        `json:"-"`        // ex.: bf26617b40af84e1004c5e345bbbf7da12f121b3@kujira1-2:11256,...
+	Host      string        `json:"-"`        // ex.: kujira1-1 or 127.0.0.1
+	Ports     Ports         `json:"-"`
+	ApiUrl    string        `json:"api_url"`
+	AppUrl    string        `json:"app_url"`
+	RpcUrl    string        `json:"rpc_url"`
+	GrpcUrl   string        `json:"grpc_url"`
+	FeederUrl string        `json:"feeder_url"`
+	OracleUrl string        `json:"-"`
+	IpAddr    string        `json:"-"`
+	Signer    signer.Signer `json:"-"`
+}
+
+type Config struct {
+	Signer string
 }
 
 func NewNode(
 	logger zerolog.Logger,
 	command, binary, address, chainType string,
 	typeNum, nodeNum, chainNum uint,
+	config Config, // true -> remote signer, false -> local
 ) (Node, error) {
 	moniker := fmt.Sprintf("%s%d-%d", chainType, typeNum, nodeNum)
 
 	logger = logger.With().
 		Str("node", moniker).
 		Logger()
+
+	logger.Trace().Msg("new node")
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -88,6 +98,7 @@ func NewNode(
 		Grpc:   base + "90",
 		Pprof:  base + "60",
 		Rpc:    base + "57",
+		Signer: base + "59",
 	}
 
 	node := Node{
@@ -129,6 +140,26 @@ func NewNode(
 		node.FeederUrl = fmt.Sprintf(
 			"http://127.0.0.1:%s/api/v1/prices", ports.Feeder,
 		)
+	}
+
+	if config.Signer != "" {
+		var err error
+
+		host := node.Host
+		if node.Local && node.Command == "docker" {
+			host = "host.docker.internal"
+		}
+
+		node.Signer, err = signer.NewSigner(logger, signer.Config{
+			Type:     config.Signer,
+			Command:  node.Command,
+			ChainNum: chainNum,
+			NodeNum:  nodeNum,
+			NodeUrl:  fmt.Sprintf("tcp://%s:%s", host, node.Ports.Signer),
+		})
+		if err != nil {
+			return node, err
+		}
 	}
 
 	return node, nil
@@ -211,6 +242,14 @@ func (n *Node) Init(namespace string, amount int) error {
 	if err != nil {
 		return err
 	}
+
+	if n.Signer == nil {
+		return nil
+	}
+
+	keyfile := n.Home + "/config/priv_validator_key.json"
+
+	n.Signer.Init(namespace, keyfile)
 
 	return nil
 }
@@ -525,6 +564,10 @@ func (n *Node) error(err error) error {
 }
 
 func (n *Node) Start() error {
+	if n.Signer != nil && !n.initState {
+		n.Signer.Start()
+	}
+
 	if n.Local {
 		pid, err := n.GetPid()
 		if err != nil {
@@ -561,6 +604,10 @@ func (n *Node) Start() error {
 
 func (n *Node) Stop() error {
 	n.logger.Info().Msg("stop node")
+
+	if n.Signer != nil && !n.initState {
+		n.Signer.Stop()
+	}
 
 	n.RemoveTemp()
 

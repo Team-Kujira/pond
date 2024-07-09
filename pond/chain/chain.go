@@ -25,20 +25,24 @@ type Chain struct {
 	Type      string
 	ChainId   string
 	Addresses map[string]string
+	Signers   []string
 }
 
 type Config struct {
-	Type    string `json:"type"`     // ex.: kujira
-	TypeNum uint   `json:"type_num"` // ex.: 1
-	Nodes   uint   `json:"nodes"`    // ex.: 2
+	Type    string   `json:"type"`     // ex.: kujira
+	TypeNum uint     `json:"type_num"` // ex.: 1
+	Nodes   uint     `json:"nodes"`    // ex.: 2
+	Signers []string `json:"signers"`  // ex.: ["local", "horcrux"]
 }
 
 func NewChain(
 	logger zerolog.Logger,
-	command, binary, namespace, address, chainType string,
-	typeNum, numNodes, chainNum uint,
+	command, binary, namespace, address string,
+	// typeNum, numNodes, chainNum uint,
+	config Config,
+	chainNum uint,
 ) (Chain, error) {
-	chainId := fmt.Sprintf("%s-%d", chainType, typeNum)
+	chainId := fmt.Sprintf("%s-%d", config.Type, config.TypeNum)
 
 	logger = logger.With().
 		Str("chain", chainId).
@@ -46,26 +50,38 @@ func NewChain(
 
 	chain := Chain{
 		logger:  logger,
-		Type:    chainType,
-		Nodes:   []node.Node{},
+		Type:    config.Type,
+		Nodes:   make([]node.Node, config.Nodes),
 		Feeders: []feeder.Feeder{},
 		ChainId: chainId,
 		Command: command,
+		Signers: config.Signers,
 	}
 
-	for i := uint(1); i <= numNodes; i++ {
+	for i := 0; i < len(chain.Nodes); i++ {
+		var signer string
+		if len(config.Signers) > i {
+			switch config.Signers[i] {
+			case "horcrux":
+				signer = config.Signers[i]
+			}
+		}
+
 		node, err := node.NewNode(
-			logger, command, binary, address, chainType, typeNum, i, chainNum,
+			logger, command, binary, address,
+			config.Type, config.TypeNum, uint(i+1), chainNum, node.Config{
+				Signer: signer,
+			},
 		)
 		if err != nil {
 			logger.Err(err).Msg("")
 			return Chain{}, err
 		}
 
-		chain.Nodes = append(chain.Nodes, node)
+		chain.Nodes[i] = node
 
 		if chainId == "kujira-1" {
-			feeder, err := feeder.NewFeeder(logger, command, address, chainNum, i)
+			feeder, err := feeder.NewFeeder(logger, command, address, chainNum, uint(i+1))
 			if err != nil {
 				logger.Err(err).Msg("")
 				return Chain{}, err

@@ -1,0 +1,12 @@
+signMode: threshold
+thresholdMode:
+  threshold: 1
+  cosigners:
+  - shardID: 1
+    p2pAddr: "tcp://127.0.0.1:{{ .Port }}"
+  grpcTimeout: 1000ms
+  raftTimeout: 1000ms
+chainNodes:
+- privValAddr: "{{ .NodeUrl }}"
+debugAddr: ""
+grpcAddr: ""

@@ -9,16 +9,15 @@ import (
 )
 
 type Config struct {
-	Command      string            `json:"command"`
-	Namespace    string            `json:"namespace"`
-	Versions     map[string]string `json:"versions"`
-	Chains       []chain.Config    `json:"chains"`
-	Plans        []string          `json:"plans"`
-	ApiUrl       string            `json:"api_url"`
-	RpcUrl       string            `json:"rpc_url"`
-	Address      string            `json:"address"`
-	Binary       string            `json:"binary"`
-	RemoteSigner string            `json:"remote_signer"`
+	Command   string            `json:"command"`
+	Namespace string            `json:"namespace"`
+	Versions  map[string]string `json:"versions"`
+	Chains    []chain.Config    `json:"chains"`
+	Plans     []string          `json:"plans"`
+	ApiUrl    string            `json:"api_url"`
+	RpcUrl    string            `json:"rpc_url"`
+	Address   string            `json:"address"`
+	Binary    string            `json:"binary"`
 }
 
 func (p *Pond) LoadConfig() error {

@@ -93,9 +93,7 @@ func (p *Pond) init() error {
 			binary,
 			p.config.Namespace,
 			p.config.Address,
-			config.Type,
-			config.TypeNum,
-			config.Nodes,
+			config,
 			uint(i+1),
 		)
 		if err != nil {
@@ -177,10 +175,10 @@ func (p *Pond) Start() error {
 	var err error
 	var conn net.Conn
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		conn, err = net.DialTimeout("tcp", address, time.Second*5)
 		if err != nil {
-			time.Sleep(time.Millisecond * 100)
+			time.Sleep(time.Millisecond * 300)
 		} else {
 			break
 		}
@@ -192,6 +190,21 @@ func (p *Pond) Start() error {
 
 	if conn == nil {
 		err = fmt.Errorf("unable to connect to kujira-1")
+		return p.error(err)
+	}
+
+	for i := 0; i < 10; i++ {
+		url := p.chains[0].Nodes[0].RpcUrl
+		_, err = utils.HttpGet(zerolog.Nop(), url)
+
+		if err != nil {
+			time.Sleep(time.Millisecond * 500)
+		} else {
+			break
+		}
+	}
+
+	if err != nil {
 		return p.error(err)
 	}
 
