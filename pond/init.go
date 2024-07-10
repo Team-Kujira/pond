@@ -63,7 +63,7 @@ func (p *Pond) Init(
 		number += 1
 
 		p.config.Chains = append(p.config.Chains, chain.Config{
-			Type: name, TypeNum: uint(number), Nodes: 1,
+			Type: name, TypeNum: uint(number), Nodes: 1, Signers: nil,
 		})
 
 		types[name] = number

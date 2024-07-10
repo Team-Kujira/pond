@@ -26,6 +26,7 @@ var (
 	RpcUrl        string
 	KujiraVersion string
 	Binary        string
+	Horcrux       bool
 )
 
 // initCmd represents the init command
@@ -66,6 +67,15 @@ var initCmd = &cobra.Command{
 			"app_state/staking/params/unbonding_time": unbondingTime,
 		}
 
+		signers := make([]string, Nodes)
+		for i := range signers {
+			if i == 0 && Horcrux {
+				signers[i] = "horcrux"
+			} else {
+				signers[i] = "local"
+			}
+		}
+
 		config := pond.Config{
 			Command:   "docker",
 			Binary:    Binary,
@@ -78,6 +88,7 @@ var initCmd = &cobra.Command{
 				Type:    "kujira",
 				TypeNum: 1,
 				Nodes:   Nodes,
+				Signers: signers,
 			}},
 			Versions: globals.Versions,
 		}
@@ -106,6 +117,7 @@ func init() {
 	initCmd.PersistentFlags().StringVar(&Binary, "binary", "", "Path to local Kujira binary")
 	initCmd.PersistentFlags().BoolVar(&NoContracts, "no-contracts", false, "Don't deploy contracts on first start")
 	initCmd.PersistentFlags().BoolVar(&Empty, "empty", false, "Don't deploy contracts on first start")
+	initCmd.PersistentFlags().BoolVar(&Horcrux, "horcrux", false, "Use horcrux remote signers")
 
 	initCmd.PersistentFlags().MarkDeprecated("no-contracts", "please use '--empty instead'")
 
