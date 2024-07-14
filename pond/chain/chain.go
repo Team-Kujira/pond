@@ -12,6 +12,7 @@ import (
 	"pond/pond/chain/feeder"
 	"pond/pond/chain/node"
 	"pond/pond/globals"
+	"pond/pond/templates"
 	"pond/utils"
 
 	"github.com/rs/zerolog"
@@ -168,76 +169,43 @@ func (c *Chain) error(err error) error {
 	return err
 }
 
-func (c *Chain) UpdateGenesis(overrides map[string]string) error {
-	denoms := []string{
-		"BTC",
-		"ETH",
-		"KUJI",
-		"STETH",
-		"USDC",
-		"USK",
-	}
-	config := map[string]map[string]interface{}{
-		"_default": {
-			"app_state/gov/params/max_deposit_period": "120s",
-			"app_state/gov/params/voting_period":      "120s",
-		},
-		"kujira": {
-			"app_state/mint/minter/inflation": "0.0",
-		},
-		"kujira-99f7924-2": {
-			"app_state/oracle/params/required_denoms":             denoms,
-			"consensus/params/abci/vote_extensions_enable_height": "1",
-		},
-	}
+func (c *Chain) UpdateGenesis(overrides []byte) error {
+	c.logger.Debug().Msg("update genesis")
 
 	node := c.Nodes[0]
 
 	filename := node.Home + "/config/genesis.json"
 
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return c.error(err)
-	}
-
-	var root interface{}
-	err = json.Unmarshal(data, &root)
+	genesis, err := os.ReadFile(filename)
 	if err != nil {
 		return c.error(err)
 	}
 
 	version, found := globals.Versions[node.Type]
 	if !found {
-		return fmt.Errorf("version not found")
+		return c.error(fmt.Errorf("version not found"))
 	}
-	keys := []string{"_default", node.Type, node.Type + "-" + version}
+
+	keys := []string{"default", node.Type, node.Type + "-" + version}
 	for _, key := range keys {
-		values, found := config[key]
-		if !found {
-			continue
+		src := fmt.Sprintf("genesis/%s.json", key)
+		content, err := templates.Templates.ReadFile(src)
+		if err != nil {
+			return c.error(err)
 		}
 
-		for path, value := range values {
-			err = utils.JsonReplace(root, path, value)
-			if err != nil {
-				return c.error(err)
-			}
-		}
-	}
-
-	for path, value := range overrides {
-		err = utils.JsonReplace(root, path, value)
+		genesis, err = utils.JsonMerge(genesis, content)
 		if err != nil {
 			return c.error(err)
 		}
 	}
 
-	out, err := json.Marshal(root)
+	genesis, err = utils.JsonMerge(genesis, overrides)
 	if err != nil {
 		return c.error(err)
 	}
 
-	os.WriteFile(filename, out, 0o666)
+	os.WriteFile(filename, genesis, 0o666)
 
 	return nil
 }

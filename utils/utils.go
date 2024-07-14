@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -11,7 +12,6 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -212,46 +212,56 @@ func GetVersion(logger zerolog.Logger, app string) (string, error) {
 	return version, nil
 }
 
-func JsonReplace(root interface{}, path string, value interface{}) error {
-	keys := strings.Split(path, "/")
+func JsonMerge(data1, data2 []byte) ([]byte, error) {
+	var iface1, iface2 interface{}
 
-	node := root
-	for i, key := range keys {
-		last := false
-		if i == len(keys)-1 {
-			last = true
-		}
-
-		path := strings.Join(keys[:i+1], "/")
-
-		nextMap, ok := node.(map[string]interface{})
-		if ok {
-			if last {
-				nextMap[key] = value
-			} else {
-				node = nextMap[key]
-			}
-			continue
-		}
-
-		nextSlice, ok := node.([]interface{})
-		if ok {
-			index, err := strconv.Atoi(key)
-			if err != nil {
-				return err
-			}
-			if last {
-				nextSlice[index] = value
-			} else {
-				node = nextSlice[index]
-			}
-			continue
-		}
-
-		return fmt.Errorf("type not supported: %s", path)
+	err := json.Unmarshal(data1, &iface1)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	err = json.Unmarshal(data2, &iface2)
+	if err != nil {
+		return nil, err
+	}
+
+	m, err := merge(iface1, iface2)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(m)
+}
+
+func merge(data1, data2 interface{}) (interface{}, error) {
+	map1, ok1 := data1.(map[string]interface{})
+	map2, ok2 := data2.(map[string]interface{})
+
+	if !ok1 && !ok2 {
+		return data2, nil
+	}
+
+	keys := map[string]struct{}{}
+	for key := range map1 {
+		keys[key] = struct{}{}
+	}
+
+	for key := range map2 {
+		_, found := keys[key]
+		if !found {
+			map1[key] = map2[key]
+			continue
+		}
+
+		value, err := merge(map1[key], map2[key])
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		map1[key] = value
+	}
+
+	return map1, nil
 }
 
 func Template(src, dst string, data any) error {

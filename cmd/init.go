@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"pond/pond"
@@ -27,6 +28,7 @@ var (
 	KujiraVersion string
 	Binary        string
 	Horcrux       bool
+	Overrides     string
 )
 
 // initCmd represents the init command
@@ -61,11 +63,30 @@ var initCmd = &cobra.Command{
 			check(err)
 		}
 
-		unbondingTime := fmt.Sprintf("%ds", UnbondingTime)
-
-		options := map[string]string{
-			"app_state/staking/params/unbonding_time": unbondingTime,
+		overrides := []byte("{}")
+		if Overrides != "" {
+			overrides, err = os.ReadFile(Overrides)
+			check(err)
 		}
+
+		// unbondingTime := fmt.Sprintf("%ds", UnbondingTime)
+
+		overrides, err = utils.JsonMerge(overrides, []byte(fmt.Sprintf(`
+		{
+			"app_state": {
+				"staking": {
+					"params": {
+						"unbonding_time": "%ds"
+					}
+				}
+			}
+		}`, UnbondingTime)))
+
+		check(err)
+
+		// options := map[string]string{
+		// 	"app_state/staking/params/unbonding_time": unbondingTime,
+		// }
 
 		signers := make([]string, Nodes)
 		for i := range signers {
@@ -99,7 +120,7 @@ var initCmd = &cobra.Command{
 
 		pond, _ := pond.NewPond(LogLevel)
 		pond.Init(
-			config, Chains, options,
+			config, Chains, overrides,
 		)
 	},
 }
@@ -115,6 +136,7 @@ func init() {
 	initCmd.PersistentFlags().StringVar(&RpcUrl, "rpc-url", "https://rpc.cosmos.directory/kujira", "Set RPC URL")
 	initCmd.PersistentFlags().StringVar(&KujiraVersion, "kujira-version", "", "Set Kujira version")
 	initCmd.PersistentFlags().StringVar(&Binary, "binary", "", "Path to local Kujira binary")
+	initCmd.PersistentFlags().StringVar(&Overrides, "overrides", "", "Path to genesis overrides")
 	initCmd.PersistentFlags().BoolVar(&NoContracts, "no-contracts", false, "Don't deploy contracts on first start")
 	initCmd.PersistentFlags().BoolVar(&Empty, "empty", false, "Don't deploy contracts on first start")
 	initCmd.PersistentFlags().BoolVar(&Horcrux, "horcrux", false, "Use horcrux remote signers")

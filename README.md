@@ -98,6 +98,31 @@ In case you need a custom Kujira version, you can use a local kujirad binary. Th
 pond init --binary /path/to/my/kujirad
 ```
 
+### Overrides
+
+You can override default genesis parameters by providing a json file containing all the needed changes.
+
+```text
+pond init --overrides custom-settings.json
+```
+
+custom-settings.json:
+
+```json
+{
+  "app_state": {
+    "oracle": {
+      "params": {
+        "required_denoms": [
+          "FOO",
+          "BAR"
+        ]
+      }
+    }
+  }
+}
+```
+
 ## Start
 
 Start your Pond
