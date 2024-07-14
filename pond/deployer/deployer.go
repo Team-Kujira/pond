@@ -653,6 +653,10 @@ func (d *Deployer) CreateContractMsgs(
 			continue
 		}
 
+		if contract.Allocate {
+			continue
+		}
+
 		data, err := json.Marshal(contract.Msg)
 		if err != nil {
 			return nil, d.error(err)

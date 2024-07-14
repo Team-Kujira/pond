@@ -19,14 +19,15 @@ type (
 	}
 
 	Contract struct {
-		Address string
-		Name    string                     `json:"name"`
-		Code    string                     `json:"code"`
-		Label   string                     `json:"label"`
-		Funds   string                     `json:"funds"`
-		Msg     map[string]json.RawMessage `json:"msg"`
-		Creates []Denom                    `json:"creates"`
-		Actions []Action                   `json:"actions"`
+		Address  string
+		Name     string                     `json:"name"`
+		Code     string                     `json:"code"`
+		Label    string                     `json:"label"`
+		Funds    string                     `json:"funds"`
+		Msg      map[string]json.RawMessage `json:"msg"`
+		Creates  []Denom                    `json:"creates"`
+		Actions  []Action                   `json:"actions"`
+		Allocate bool                       `json:"allocate"`
 	}
 
 	Funds struct {
