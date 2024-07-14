@@ -2,6 +2,7 @@ package chain
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -191,6 +192,9 @@ func (c *Chain) UpdateGenesis(overrides []byte) error {
 		src := fmt.Sprintf("genesis/%s.json", key)
 		content, err := templates.Templates.ReadFile(src)
 		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
 			return c.error(err)
 		}
 
