@@ -51,6 +51,9 @@ func (p *Pond) Init(
 	}
 
 	p.config = config
+	if local {
+		p.config.Versions["kujira"] = ""
+	}
 
 	types := map[string]int{
 		"kujira": 1,

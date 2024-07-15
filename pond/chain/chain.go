@@ -37,6 +37,12 @@ type Config struct {
 	Signers []string `json:"signers"`  // ex.: ["local", "horcrux"]
 }
 
+type Block struct {
+	Header struct {
+		Time time.Time `json:"time"`
+	} `json:"header"`
+}
+
 func NewChain(
 	logger zerolog.Logger,
 	command, binary, namespace, address string,
@@ -308,8 +314,9 @@ func (c *Chain) SubmitProposal(data []byte, option string) error {
 	// get the latest proposal
 
 	args = []string{
-		// "gov", "proposals", "--status", "voting_period", "--reverse",
-		"gov", "proposals", "--output", "json", "--page-reverse",
+		// TODO: < sdk-50
+		"gov", "proposals", "--status", "voting_period", "--reverse", "--output", "json",
+		// "gov", "proposals", "--output", "json", "--page-reverse",
 	}
 
 	output, err = node.Query(args)
@@ -403,4 +410,74 @@ func (c *Chain) WaitForNode(name string) error {
 	}
 
 	return nil
+}
+
+func (c *Chain) GetBlock(height int64) (Block, error) {
+	var block Block
+	// < sdk-50
+	var response struct {
+		Block Block `json:"block"`
+	}
+
+	node := c.Nodes[0]
+
+	args := []string{
+		// --output param only available > sdk-50
+		// "block", "--output", "json", "--type", "height", fmt.Sprint(height),
+		"block", fmt.Sprint(height),
+	}
+
+	output, err := node.Query(args)
+	if err != nil {
+		fmt.Println(string(output))
+		return block, err
+	}
+
+	err = json.Unmarshal(output, &response)
+	if err != nil {
+		return block, err
+	}
+
+	// < sdk-50
+	block = response.Block
+
+	return block, nil
+}
+
+func (c *Chain) GetBlockTime(interval int64) (time.Duration, error) {
+	c.logger.Info().Msg("calculate block time")
+
+	height, err := c.GetHeight()
+	if err != nil {
+		return -1, c.error(err)
+	}
+
+	if height < 2 {
+		return -1, c.error(fmt.Errorf("height < 2"))
+	}
+
+	block, err := c.GetBlock(height)
+	if err != nil {
+		return -1, c.error(err)
+	}
+
+	timestamp1 := block.Header.Time
+
+	if height > interval {
+		height = height - interval
+	} else {
+		interval = height - 1
+		height = 1
+	}
+
+	block, err = c.GetBlock(height)
+	if err != nil {
+		return -1, c.error(err)
+	}
+
+	timestamp0 := block.Header.Time
+
+	blockTime := timestamp1.Sub(timestamp0) / time.Duration(interval)
+
+	return blockTime, nil
 }
