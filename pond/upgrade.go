@@ -42,14 +42,20 @@ func (p *Pond) Upgrade(version, revision, binary string) error {
 		return p.error(err)
 	}
 
-	// Get block time
-
-	blockTime, err := chain.GetBlockTime(20)
+	height, err := chain.GetHeight()
 	if err != nil {
 		return err
 	}
 
-	height, err := chain.GetHeight()
+	if height < 2 {
+		amount := 2 - height
+		p.logger.Info().Int64("blocks", amount).Msg("wait for blocks")
+		chain.WaitBlocks(2 - height)
+	}
+
+	// Get block time
+
+	blockTime, err := chain.GetBlockTime(20)
 	if err != nil {
 		return err
 	}
