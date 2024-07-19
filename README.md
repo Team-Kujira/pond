@@ -234,6 +234,12 @@ pagination:
   total: "0"
 ```
 
+## Upgrade
+
+Upgrade provides an easy way to test chain upgrades. For this to work, Pond creates an upgrade proposal, waits for the upgrade height and then restarts using the new binary.
+
+:warning: **Only works in `--binary` mode**
+
 ## Government
 
 Submit a gov proposal and optionally let all validators vote with the specified option.

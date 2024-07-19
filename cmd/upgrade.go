@@ -13,7 +13,7 @@ var upgradeCmd = &cobra.Command{
 	// Long: ``,
 	Run: func(cmd *cobra.Command, args []string) {
 		pond, _ := pond.NewPond(LogLevel)
-		err := pond.Upgrade(Version, "", Binary)
+		err := pond.Upgrade(Version, Binary)
 		check(err)
 	},
 }

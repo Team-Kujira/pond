@@ -8,7 +8,7 @@ import (
 
 type Block struct{}
 
-func (p *Pond) Upgrade(version, revision, binary string) error {
+func (p *Pond) Upgrade(version, binary string) error {
 	if version == "" {
 		return fmt.Errorf("no version provided")
 	}
@@ -111,10 +111,6 @@ func (p *Pond) Upgrade(version, revision, binary string) error {
 
 	p.Stop()
 
-	// if revision == "" {
-	// 	revision = "1"
-	// }
-	// p.config.Versions["kujira"] = version + "-" + revision
 	p.config.Binary = binary
 
 	for i := range p.chains[0].Nodes {
