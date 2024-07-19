@@ -16,7 +16,7 @@ import (
 func (p *Pond) Init(
 	config Config,
 	chains []string,
-	options map[string]string,
+	overrides []byte,
 ) error {
 	p.logger.Info().Msg("init pond")
 
@@ -51,6 +51,9 @@ func (p *Pond) Init(
 	}
 
 	p.config = config
+	if local {
+		p.config.Versions["kujira"] = ""
+	}
 
 	types := map[string]int{
 		"kujira": 1,
@@ -126,7 +129,7 @@ func (p *Pond) Init(
 	for i := range p.chains {
 		wg.Add(1)
 		go func(i int) {
-			p.chains[i].Init(p.config.Namespace, options)
+			p.chains[i].Init(p.config.Namespace, overrides)
 
 			mtx.Lock()
 			p.info.Validators[p.chains[i].ChainId] = p.chains[i].Nodes

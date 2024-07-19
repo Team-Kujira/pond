@@ -1,0 +1,23 @@
+{
+  "app_state": {
+    "oracle": {
+      "params": {
+        "required_denoms": [
+          "BTC",
+          "ETH",
+          "KUJI",
+          "STETH",
+          "USDC",
+          "USK"
+        ]
+      }
+    }
+  },
+  "consensus": {
+    "params": {
+      "abci": {
+        "vote_extensions_enable_height": "1"
+      }
+    }
+  }
+}

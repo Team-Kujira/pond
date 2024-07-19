@@ -98,6 +98,31 @@ In case you need a custom Kujira version, you can use a local kujirad binary. Th
 pond init --binary /path/to/my/kujirad
 ```
 
+### Overrides
+
+You can override default genesis parameters by providing a json file containing all the needed changes.
+
+```text
+pond init --overrides custom-settings.json
+```
+
+custom-settings.json:
+
+```json
+{
+  "app_state": {
+    "oracle": {
+      "params": {
+        "required_denoms": [
+          "FOO",
+          "BAR"
+        ]
+      }
+    }
+  }
+}
+```
+
 ## Start
 
 Start your Pond
@@ -207,6 +232,16 @@ balances:
 pagination:
   next_key: null
   total: "0"
+```
+
+## Upgrade
+
+Upgrade provides an easy way to test chain upgrades. For this to work, Pond creates an upgrade proposal, waits for the upgrade height and then restarts using the new binary.
+
+:warning: **Only works in `--binary` mode**
+
+```text
+pond upgrade --version v1.2.3 --binary /path/to/kujirad
 ```
 
 ## Government

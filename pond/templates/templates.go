@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-//go:embed config plan
+//go:embed config genesis plan
 var Templates embed.FS
 
 func GetPlans() ([]string, error) {

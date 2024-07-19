@@ -53,11 +53,20 @@ func (p *Pond) SaveConfig() error {
 
 	data, err := json.Marshal(p.config)
 	if err != nil {
-		p.logger.Err(err).Msg("")
-		return err
+		return p.error(err)
 	}
 
-	os.WriteFile(filename, data, 0o666)
+	file, err := os.Create(filename)
+	if err != nil {
+		return p.error(err)
+	}
+
+	defer file.Close()
+
+	_, err = file.Write(data)
+	if err != nil {
+		return p.error(err)
+	}
 
 	return nil
 }

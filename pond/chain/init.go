@@ -11,7 +11,7 @@ import (
 	"pond/utils"
 )
 
-func (c *Chain) Init(namespace string, options map[string]string) error {
+func (c *Chain) Init(namespace string, overrides []byte) error {
 	c.logger.Info().Msg("init chain")
 
 	// Prepare gentx dir for the first node, in case it doesn't finish its
@@ -143,7 +143,7 @@ func (c *Chain) Init(namespace string, options map[string]string) error {
 		return err
 	}
 
-	err = c.UpdateGenesis(options)
+	err = c.UpdateGenesis(overrides)
 	if err != nil {
 		return err
 	}
