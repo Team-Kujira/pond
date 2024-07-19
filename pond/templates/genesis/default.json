@@ -2,8 +2,8 @@
   "app_state": {
     "gov": {
       "params": {
-        "max_deposit_period": "120s",
-        "voting_period": "120s"
+        "max_deposit_period": "60s",
+        "voting_period": "60s"
       }
     }
   }
