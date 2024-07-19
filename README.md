@@ -240,6 +240,10 @@ Upgrade provides an easy way to test chain upgrades. For this to work, Pond crea
 
 :warning: **Only works in `--binary` mode**
 
+```text
+pond upgrade --version v1.2.3 --binary /path/to/kujirad
+```
+
 ## Government
 
 Submit a gov proposal and optionally let all validators vote with the specified option.
