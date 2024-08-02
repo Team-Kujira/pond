@@ -167,7 +167,7 @@ func NewNode(
 
 func (n *Node) NewCommand(command []string) []string {
 	if n.Local {
-		return append(command, []string{"--home", n.Home}...)
+		return append(command, []string{"--node", n.RpcUrl}...)
 	}
 
 	return append([]string{
